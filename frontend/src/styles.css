@@ -1,0 +1,551 @@
+/* ---------------------------------------------------------------------------
+   Catchment Analyzer — a printed survey report that happens to be interactive.
+   Warm paper, hairline rules, serif headings, numbers set in a tabular face.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --paper: #f6f3ec;
+  --card: #fffefb;
+  --ink: #1d1a16;
+  --ink-soft: #6c6459;
+  --ink-faint: #9a9184;
+  --rule: #e2dbcd;
+  --rule-strong: #cec5b3;
+
+  --water: #146b6b;
+  --water-soft: #e0efee;
+  --clay: #b2542c;
+  --clay-soft: #f7e9e1;
+  --wheat: #a8801f;
+
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, ui-serif, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --shadow: 0 1px 2px rgba(29, 26, 22, 0.04), 0 8px 24px -16px rgba(29, 26, 22, 0.3);
+
+  --notice-error-ink: #7a3418;
+  --notice-warn-bg: #faf3e0;
+  --notice-warn-ink: #6b5314;
+  --map-void: #e8e3d8;
+  --veil: rgba(246, 243, 236, 0.92);
+  --glass: rgba(255, 254, 251, 0.85);
+
+  color-scheme: light;
+}
+
+/* Dark is the same paper held under a different lamp: the warmth stays, the
+   lightness inverts. Only colour is restated here — every rule, size and weight
+   above is shared, so the two themes cannot drift apart. */
+[data-theme='dark'] {
+  --paper: #16140f;
+  --card: #1e1b15;
+  --ink: #ece6da;
+  --ink-soft: #a79e8e;
+  --ink-faint: #7b7365;
+  --rule: #322d24;
+  --rule-strong: #473f33;
+
+  --water: #4fb3ac;
+  --water-soft: #16322f;
+  --clay: #d98056;
+  --clay-soft: #33211a;
+  --wheat: #d0a63f;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -14px rgba(0, 0, 0, 0.8);
+
+  --notice-error-ink: #f0b393;
+  --notice-warn-bg: #2b2313;
+  --notice-warn-ink: #e6c778;
+  --map-void: #12100c;
+  --veil: rgba(22, 20, 15, 0.92);
+  --glass: rgba(30, 27, 21, 0.85);
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+
+button, input, select { font: inherit; color: inherit; }
+
+/* --- shell ---------------------------------------------------------------- */
+
+.shell { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 14px 24px;
+  background: var(--card);
+  border-bottom: 1px solid var(--rule-strong);
+}
+.masthead h1 { font-size: 20px; }
+.masthead .rule { flex: 1; height: 1px; background: var(--rule); }
+.theme-toggle {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.theme-toggle:hover { color: var(--water); border-color: var(--water); }
+
+.masthead .tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.workspace { display: grid; grid-template-columns: 392px 1fr; min-height: 0; }
+
+.column {
+  overflow-y: auto;
+  border-right: 1px solid var(--rule-strong);
+  background: var(--paper);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stage { position: relative; min-height: 0; }
+
+/* --- cards ---------------------------------------------------------------- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  box-shadow: var(--shadow);
+}
+.card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+.card > header h2 { font-size: 14px; }
+.card .body { padding: 16px; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* --- choosing a terrain source -------------------------------------------- */
+
+/* The mode switch sits inside the card, so it needs the card's own margins
+   rather than the flush edges the map's segmented control has. */
+.segmented.modes { margin: 16px 16px 0; }
+.segmented.modes button { padding: 7px 0; font-size: 12px; }
+
+/* Places worth a first look, offered as one line of quiet links. */
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  color: var(--ink-faint);
+}
+.examples button {
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--paper);
+  padding: 3px 7px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.examples button:hover { border-color: var(--water); color: var(--water); }
+
+/* Searching for a place. The results sit in the flow rather than floating, so
+   choosing one never covers the fields underneath. */
+.search { padding: 14px 16px 0; }
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink-faint);
+}
+.search-box:focus-within { outline: 2px solid var(--water); outline-offset: -1px; color: var(--water); }
+.search-box input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--ink);
+}
+.search-box input::-webkit-search-cancel-button { filter: grayscale(1) opacity(0.6); }
+
+.results {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  max-height: 168px;
+  overflow-y: auto;
+}
+.results li + li { border-top: 1px solid var(--rule); }
+.results button {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.results button:hover { background: var(--water-soft); }
+.results .place { font-size: 12.5px; line-height: 1.35; }
+.results .kind { font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); }
+.results .empty { padding: 8px 10px; font-size: 12.5px; color: var(--ink-faint); }
+
+/* What the pin is currently on. */
+.pinned {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 12px 16px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--water);
+  background: var(--water-soft);
+}
+.pinned strong { font-size: 12.5px; line-height: 1.35; }
+.pinned span { font-size: 11px; color: var(--ink-soft); }
+
+/* The elevation check reads as a field, because that is where it sits. */
+.probe {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.probe:hover:not(:disabled) { border-color: var(--water); color: var(--water); }
+.probe:disabled { color: var(--ink-faint); cursor: not-allowed; }
+
+.footnote { padding: 10px 16px 0; font-size: 11.5px; color: var(--ink-faint); }
+.footnote a { color: var(--water); }
+
+/* --- upload --------------------------------------------------------------- */
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 26px 18px;
+  margin: 16px;
+  text-align: center;
+  border: 1.5px dashed var(--rule-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.dropzone:hover, .dropzone.hot { border-color: var(--water); background: var(--water-soft); color: var(--water); }
+.dropzone strong { color: var(--ink); font-size: 14px; }
+.dropzone small { color: var(--ink-faint); }
+.dropzone.loaded { border-style: solid; border-color: var(--water); background: var(--water-soft); }
+
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px 16px; }
+/* min-width:0 or the number spinners push each field past its grid column,
+   and the right-hand half of the form is clipped by the card. */
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); }
+.field input, .field select {
+  padding: 7px 9px;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.field input:focus, .field select:focus { outline: 2px solid var(--water); outline-offset: -1px; }
+/* Text that is not a usable coordinate yet. The pin has not moved, and the box
+   says so rather than leaving the two silently disagreeing. */
+.field input[aria-invalid='true'] { border-color: var(--clay); background: var(--clay-soft); }
+.field input[aria-invalid='true']:focus { outline-color: var(--clay); }
+.field .hint { font-size: 11px; color: var(--ink-faint); }
+
+.run {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 32px);
+  margin: 0 16px 16px;
+  padding: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 2px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.run:hover:not(:disabled) { background: var(--water); }
+.run:disabled { background: var(--rule-strong); color: var(--card); cursor: not-allowed; }
+
+.notice {
+  display: flex;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 2px;
+  font-size: 13px;
+  border-left: 3px solid;
+}
+.notice.error { background: var(--clay-soft); border-color: var(--clay); color: var(--notice-error-ink); }
+.notice code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: rgba(128, 128, 128, 0.16);
+  word-break: break-word;
+}
+.notice.warn { background: var(--notice-warn-bg); border-color: var(--wheat); color: var(--notice-warn-ink); }
+
+/* --- readings ------------------------------------------------------------- */
+
+.headline { padding: 16px; border-bottom: 1px solid var(--rule); }
+.headline .value { font-family: var(--serif); font-size: 40px; line-height: 1; letter-spacing: -0.02em; }
+.headline .value span { font-family: var(--sans); font-size: 15px; color: var(--ink-soft); margin-left: 6px; letter-spacing: 0; }
+.headline .caption { color: var(--ink-soft); margin-top: 6px; }
+
+.readings { display: grid; grid-template-columns: 1fr 1fr; }
+.reading { padding: 11px 16px; border-top: 1px solid var(--rule); }
+.reading:nth-child(odd) { border-right: 1px solid var(--rule); }
+.reading dt { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); }
+.reading dd { margin: 2px 0 0; font-size: 16px; font-variant-numeric: tabular-nums; }
+.reading dd small { font-size: 12px; color: var(--ink-soft); margin-left: 3px; }
+
+.rows { display: flex; flex-direction: column; }
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 16px;
+  border-top: 1px solid var(--rule);
+}
+.row:first-child { border-top: none; }
+.row dt { color: var(--ink-soft); }
+.row dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+
+/* --- scores --------------------------------------------------------------- */
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  background: var(--water-soft);
+  color: var(--water);
+}
+.badge.clay { background: var(--clay-soft); color: var(--clay); }
+
+.meters { display: flex; flex-direction: column; gap: 9px; padding: 14px 16px; }
+.meter { display: grid; grid-template-columns: 74px 1fr 34px; align-items: center; gap: 10px; }
+.meter span:first-child { font-size: 12px; color: var(--ink-soft); text-transform: capitalize; }
+.meter .track { height: 5px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+.meter .fill { height: 100%; background: var(--water); border-radius: 3px; }
+.meter span:last-child { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-soft); text-align: right; }
+
+.reasons { margin: 0; padding: 4px 16px 16px 32px; color: var(--ink-soft); }
+.reasons li { margin-bottom: 4px; }
+.reasons li::marker { color: var(--water); }
+
+/* --- alternatives --------------------------------------------------------- */
+
+.alt {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-top: 1px solid var(--rule);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.alt:hover { background: var(--water-soft); }
+.alt.active { background: var(--water-soft); box-shadow: inset 3px 0 0 var(--water); }
+.alt .rank { font-family: var(--serif); font-size: 17px; color: var(--ink-faint); }
+.alt .where { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+.alt .score { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* --- map ------------------------------------------------------------------ */
+
+.leaflet-container { height: 100%; width: 100%; background: var(--map-void); font-family: var(--sans); }
+.leaflet-control-attribution {
+  font-size: 10px;
+  background: var(--glass) !important;
+  color: var(--ink-soft);
+}
+.leaflet-control-attribution a { color: var(--water); }
+
+/* Leaflet paints its own chrome white, which a dark page cannot live with. */
+.leaflet-bar a,
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--card);
+  color: var(--ink);
+}
+.leaflet-bar a:hover { background: var(--water-soft); color: var(--water); }
+.leaflet-bar a { border-bottom-color: var(--rule); }
+.leaflet-popup-content-wrapper { box-shadow: var(--shadow); }
+.leaflet-popup-content { line-height: 1.5; }
+.leaflet-container a.leaflet-popup-close-button { color: var(--ink-faint); }
+
+.map-panel {
+  position: absolute;
+  z-index: 500;
+  background: var(--card);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  box-shadow: var(--shadow);
+}
+.map-panel.layers { top: 14px; right: 14px; width: 178px; padding: 10px 12px; }
+.map-panel.legend { bottom: 22px; left: 14px; padding: 10px 12px; }
+/* Bottom left, clear of Leaflet's zoom control — and the slot the legend uses
+   once there is a result, which is exactly when this panel goes away. */
+.map-panel.hint { bottom: 22px; left: 14px; width: 250px; padding: 12px 14px; }
+.map-panel.hint p { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+.map-panel.hint .steps { margin-top: 8px; }
+
+.muted { margin: 6px 0 0; font-size: 12px; color: var(--ink-faint); }
+
+.toggle { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; font-size: 12.5px; }
+.toggle input { accent-color: var(--water); margin: 0; }
+
+.swatches { display: flex; flex-direction: column; gap: 5px; margin-top: 7px; }
+.swatch { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft); }
+.swatch i { width: 15px; height: 3px; border-radius: 2px; display: inline-block; }
+.swatch i.area { height: 11px; width: 15px; border-radius: 2px; }
+
+.segmented { display: flex; border: 1px solid var(--rule-strong); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+.segmented button {
+  flex: 1;
+  padding: 5px 0;
+  border: none;
+  background: var(--card);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.segmented button + button { border-left: 1px solid var(--rule-strong); }
+.segmented button.on { background: var(--ink); color: var(--paper); }
+
+.range { width: 100%; accent-color: var(--water); margin-top: 6px; }
+
+/* --- empty + busy states -------------------------------------------------- */
+
+.curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--veil);
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 24px;
+}
+.curtain h2 { font-size: 21px; color: var(--ink); }
+.curtain p { max-width: 380px; margin: 0; }
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--rule-strong);
+  border-top-color: var(--water);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.steps { list-style: none; margin: 6px 0 0; padding: 0; font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); }
+.steps li { padding: 1px 0; }
+
+/* --- marker --------------------------------------------------------------- */
+
+.pin {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50% 50% 50% 2px;
+  transform: rotate(-45deg);
+  border: 2px solid var(--card);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+.pin b { transform: rotate(45deg); }
+.pin.primary { background: var(--clay); }
+.pin.other { background: var(--ink-soft); }
+.pin.target { background: var(--water); }
+
+/* --- narrow screens ------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; grid-template-rows: auto 60vh; }
+  .column { border-right: none; border-bottom: 1px solid var(--rule-strong); }
+}
+
+.spin { animation: spin 0.9s linear infinite; }

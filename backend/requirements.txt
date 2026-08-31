@@ -1,0 +1,15 @@
+# Web layer
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+python-multipart>=0.0.9
+
+# Terrain, both ways in
+httpx>=0.27          # talks to the OpenZenith elevation service
+numpy>=2.1
+scipy>=1.14
+shapely>=2.0
+pillow>=10.3
+
+# Tests
+pytest>=8.0
