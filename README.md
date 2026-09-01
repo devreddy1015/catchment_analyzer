@@ -41,13 +41,13 @@ npm --prefix frontend install
 ```
 
 **`./dev.sh` is the one to use**, because there are two servers and both must be
-running. The interface on port 3000 is only a front for the API on port 5000; on
+running. The interface on port 3000 is only a front for the API on port 5249; on
 its own it can draw the map and nothing else. If you would rather start them by
 hand, that is two terminals, both at the project root:
 
 ```bash
 # terminal 1 — the API
-.venv/bin/uvicorn backend.main:app --reload --port 5000
+.venv/bin/uvicorn backend.main:app --reload --port 5249
 
 # terminal 2 — the interface
 npm --prefix frontend run dev
@@ -62,16 +62,16 @@ you `Could not open requirements file` and a `.venv` in the wrong place.
 | What | Where |
 |---|---|
 | Web interface | http://localhost:3000 |
-| API | http://localhost:5000/api/analyzeContour |
-| Interactive API docs | http://localhost:5000/docs |
+| API | http://localhost:5249/api/analyzeContour |
+| Interactive API docs | http://localhost:5249/docs |
 
-`docker compose up --build` runs everything in one container on port 5000, UI
+`docker compose up --build` runs everything in one container on port 5249, UI
 included — one process, so nothing to forget.
 
 Try it straight away with the contour map in this repo:
 
 ```bash
-curl -X POST http://localhost:5000/api/analyzeContour \
+curl -X POST http://localhost:5249/api/analyzeContour \
   -F "file=@contours_1m.kml" \
   -F "rainfall_mm=1150"
 ```
@@ -79,7 +79,7 @@ curl -X POST http://localhost:5000/api/analyzeContour \
 Or with no file at all — 5 km of the Deccan plateau:
 
 ```bash
-curl -X POST http://localhost:5000/api/analyzeArea \
+curl -X POST http://localhost:5249/api/analyzeArea \
   -H "Content-Type: application/json" \
   -d '{"latitude": 18.52, "longitude": 73.75, "area_km": 5, "rainfall_mm": 700}'
 ```
@@ -208,7 +208,7 @@ latitude. Proxied from Nominatim, best match first, up to `limit` results
 (default 5, max 10). An empty list means nothing matched, which is not an error.
 
 ```bash
-curl "http://localhost:5000/api/places?q=durg"
+curl "http://localhost:5249/api/places?q=durg"
 [{"name":"Durg, Chhattisgarh, India","latitude":21.1983,"longitude":81.4008,
   "kind":"administrative"},
  {"name":"Durg, Durg Tahsil, Durg, Chhattisgarh, 491002, India",
@@ -222,7 +222,7 @@ which is what makes it useful — it says whether a point is land with usable da
 before you commit to a full area analysis.
 
 ```bash
-curl "http://localhost:5000/api/elevation?lat=21.2517&lon=81.2970"
+curl "http://localhost:5249/api/elevation?lat=21.2517&lon=81.2970"
 {"latitude":21.2517,"longitude":81.297,"elevation_m":273.0,
  "surface_type":"land","resolution_m":30.0,"source":"ozt2"}
 ```

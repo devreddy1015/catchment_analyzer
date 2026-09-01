@@ -1,7 +1,7 @@
 # Catchment Analyzer — Submission Report
 
 **Repository:** `<add your GitHub URL here>`
-**Deployed API:** `<add your deployed URL here>` — locally `http://localhost:5000`
+**Deployed API:** `<add your deployed URL here>` — locally `http://localhost:5249`
 
 | | |
 |---|---|
@@ -107,7 +107,7 @@ the time of concentration by Kirpich's formula, and the rational method
 ## 2. Demonstration — `contours_1m.kml`
 
 ```bash
-curl -X POST http://localhost:5000/api/analyzeContour \
+curl -X POST http://localhost:5249/api/analyzeContour \
   -F "file=@contours_1m.kml" \
   -F "rainfall_mm=1150"
 ```
@@ -155,7 +155,7 @@ site points, longest flow path, drainage lines — comes back as one GeoJSON
 ## 3. Demonstration — no file at all
 
 ```bash
-curl -X POST http://localhost:5000/api/analyzeArea \
+curl -X POST http://localhost:5249/api/analyzeArea \
   -H "Content-Type: application/json" \
   -d '{"latitude": 18.52, "longitude": 73.75, "area_km": 5, "rainfall_mm": 700, "runoff_coefficient": 0.3}'
 ```
