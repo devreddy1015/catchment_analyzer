@@ -2,7 +2,7 @@ services:
   catchment-analyzer:
     build: .
     ports:
-      - "5000:5000"
+      - "5249:5000"
     environment:
       PYTHONUNBUFFERED: "1"
     restart: unless-stopped
