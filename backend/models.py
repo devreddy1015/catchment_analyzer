@@ -94,11 +94,61 @@ class SiteInfo(BaseModel):
     slope_deg: float
     depression_depth_m: float
     upstream_cells: int
+    upstream_hectares: float = Field(
+        default=0.0, description="Land draining through this point. What decides the structure."
+    )
+    height_above_drainage_m: float | None = Field(
+        default=None,
+        description="How far the site stands above the drainage line it drains into. "
+                    "Low means floodplain, whatever the distance to the channel. Null "
+                    "when the water leaves the map without meeting one, which is "
+                    "unknown rather than zero.",
+    )
+    structure: Literal["farm_pond", "nala"] = Field(
+        default="farm_pond", description="What can actually be built here."
+    )
+    structure_label: str = Field(default="Farm pond", description="``structure`` in words.")
     score: float = Field(description="Terrain suitability, 0-100.")
     rating: str
     score_breakdown: dict[str, float]
     storage: StorageInfo
     reasons: list[str]
+
+
+class WatercourseInfo(BaseModel):
+    """Ground withheld from pond siting because water is already using it.
+
+    Classes are cut by upstream catchment area in hectares, not by a percentile
+    of this map, so they mean the same thing everywhere. A river and open water
+    carry no proposal at all; a nala is offered back as the structure it takes.
+    """
+
+    farm_pond_max_catchment_ha: float = Field(
+        description="Above this a site is a bund or tank, not a farm pond."
+    )
+    river_min_catchment_ha: float = Field(
+        description="Above this it is a river: no structure is proposed on it."
+    )
+    river_buffer_m: float = Field(description="Channel width kept clear either side of a river.")
+    river_floodplain_hand_m: float = Field(
+        description="Ground standing less than this above a river is its floodplain."
+    )
+    nala_bank_hand_m: float = Field(
+        description="Ground standing less than this above a nala is its bed and banks."
+    )
+    river_hectares: float
+    truncated_hectares: float = Field(
+        default=0.0,
+        description="Channel fed from outside the map. Its measured catchment is a floor, "
+                    "not a figure, so it is treated as river and nothing is proposed on it.",
+    )
+    floodplain_hectares: float
+    nala_hectares: float
+    still_water_hectares: float
+    excluded_fraction: float = Field(description="Share of the map withheld from pond siting.")
+    note: str = Field(
+        description="What the classification can and cannot tell you about the water."
+    )
 
 
 class RunoffInfo(BaseModel):
@@ -137,6 +187,9 @@ class Overlays(BaseModel):
 
     elevation: str
     hillshade: str
+    watercourse: str = Field(
+        default="", description="Ground withheld from pond siting: river, floodplain, nala, water."
+    )
     bounds: Bounds
 
 
@@ -198,9 +251,16 @@ class CatchmentAnalysis(BaseModel):
     pond_site: SiteInfo
     catchment: CatchmentInfo
     alternative_sites: list[SiteInfo]
+    watercourses: WatercourseInfo
+    channel_structures: list[SiteInfo] = Field(
+        default=[],
+        description="Places on drainage lines too large for a farm pond, offered as the "
+                    "bund or percolation tank they actually take.",
+    )
     overlays: Overlays
     geojson: dict[str, Any] = Field(
-        description="FeatureCollection: catchment boundary, pond sites, longest flow path, drainage lines."
+        description="FeatureCollection: catchment boundary, pond sites, longest flow path, "
+                    "drainage lines, excluded watercourse, channel structures."
     )
     warnings: list[str] = []
 

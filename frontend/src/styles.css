@@ -16,6 +16,7 @@
   --water-soft: #e0efee;
   --clay: #b2542c;
   --clay-soft: #f7e9e1;
+  --river: #1b4f8a;
   --wheat: #a8801f;
 
   --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, ui-serif, serif;
@@ -50,6 +51,7 @@
   --water-soft: #16322f;
   --clay: #d98056;
   --clay-soft: #33211a;
+  --river: #6ea8e0;
   --wheat: #d0a63f;
 
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -14px rgba(0, 0, 0, 0.8);
@@ -420,6 +422,10 @@ button, input, select { font: inherit; color: inherit; }
   transition: background 0.12s;
 }
 .alt:hover { background: var(--water-soft); }
+/* A row that reports rather than selects: nothing to click, so nothing to hover. */
+.alt.static { cursor: default; }
+.alt.static:hover { background: transparent; }
+.alt.static .rank { color: var(--river); }
 .alt.active { background: var(--water-soft); box-shadow: inset 3px 0 0 var(--water); }
 .alt .rank { font-family: var(--serif); font-size: 17px; color: var(--ink-faint); }
 .alt .where { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
@@ -540,6 +546,15 @@ button, input, select { font: inherit; color: inherit; }
 .pin.primary { background: var(--clay); }
 .pin.other { background: var(--ink-soft); }
 .pin.target { background: var(--water); }
+/* A bund is a different structure from a pond, so it gets a different pin:
+   square-shouldered and unfilled, so it never reads as a recommended site. */
+.pin.bund {
+  background: var(--card);
+  border-color: var(--river);
+  color: var(--river);
+  border-radius: 3px;
+  border-width: 2.5px;
+}
 
 /* --- narrow screens ------------------------------------------------------- */
 

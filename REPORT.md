@@ -53,18 +53,50 @@ catchment (0.30), slope (0.25) and relative elevation (0.15), each normalised
 against the range present in the terrain. Candidates are taken best-first with a
 minimum spacing so the result is a set of real alternatives.
 
-Active stream channels — high throughflow, no hollow — are excluded first, since
-damming one is a check dam rather than a pond. What counts as "no hollow" is the
-terrain's own vertical resolution, not a fixed depth: the contour interval, or one
-metre for integer-metre DEM tiles. A dip shallower than the source can record is
-interpolation, not ground, and on a busy channel it is what smoothing manufactures.
-An absolute 30 cm bar sat below the median hollow of a real map and excluded almost
-nothing — two of five recommendations over Durg were on the main channel, at the
-99.9th and 100th flow percentile, held up by 0.31 m and 0.41 m of "depression".
+Ground the water has already claimed is removed first, classed by upstream
+catchment area in hectares: under 25 ha is farm-pond ground, 25–100 ha is a nala
+bund or percolation tank, and over 100 ha — plus 40 m either side — is river, on
+which nothing is proposed. Standing water is excluded too, detected as a patch
+that is flat, level to the source's own vertical step, and larger than any pond.
 
-A site that clears the bar can still sit on a busy line. Where one ordinary storm
-(50 mm, rational method) delivers more than the hollow holds, the response says the
-site is a nala bund needing a spillway rather than a farm pond.
+Size is only half of the test. A site can be two hundred metres from the channel
+and still be in the river, because what floods is the valley floor. So each cell
+also carries its height above nearest drainage (HAND — follow the flow pointers
+downstream to the first channel they meet, take the elevation difference), and
+ground under 3 m above its river, or 1 m above its nala, is withheld as
+floodplain. On the sample survey the flow model found 140 channel cells, while
+the ground lying within a metre of their level was a fifth of the map — and all
+five recommended sites sat in it, at the 0th to 8th elevation percentile. None
+was on the channel; all were at the channel's elevation. With the height rule the
+same five move to the 8th–20th percentile and stand 2.1–5.7 m above the water.
+The test is not applied to the channels themselves, since a nala is level with
+the river it runs into by construction.
+
+The classification is by size rather than by depth because a wide river reads as a
+*deep* trench: the sensor returns its water surface, not its bed, and noise,
+bridges and bank canopy cut into it. A rule of "high flow but no hollow" therefore
+exempts precisely the rivers it exists to catch — measured over the Rio Negro, 35%
+of the main-stem cells escaped it, and four of five recommendations landed on the
+river, one of them rated Excellent at the 99.8th flow percentile. Nor can the
+threshold be a percentile: that calls a fixed share of every map a channel,
+whatever is on it. Hectares mean the same thing everywhere.
+
+The depth rule survives one layer down, for small channels below the nala
+threshold: a gully with a lot of flow and no hollow deeper than the source could
+record is interpolation, not ground, and on a busy channel it is what smoothing
+manufactures. The bar is the terrain's own vertical resolution — the contour
+interval, or one metre for integer-metre DEM tiles.
+
+Nothing is dropped silently. Nala-class sites are ranked separately and returned
+as the structure they take; the excluded river is drawn on the map. A hollow that
+one ordinary storm (50 mm, rational method) would fill and overtop is moved into
+that same list, rather than being ranked first as a pond with a caution saying it
+is really a nala bund.
+
+What no elevation model can settle is whether a channel runs all year: a perennial
+river and a monsoon nala are the same trench in the data. Knowing a river by name
+would need hydrography — OSM waterways, HydroSHEDS, India-WRIS — which this does
+not use.
 
 **Pond site → catchment.** Walking the flow pointers upstream from the site
 collects every contributing cell. Area is the cell count times cell area; the

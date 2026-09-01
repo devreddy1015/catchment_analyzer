@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Waves } from 'lucide-react';
 import type { Analysis, Site } from '../types';
 import { area, coords, distance, num, volume } from '../format';
 
@@ -24,7 +24,10 @@ const Row = ({ label, value }: { label: string; value: string }) => (
 
 /** Everything the API returned, read top to bottom as a survey report. */
 export default function ReportPanel({ result, selected, onSelect }: Props) {
-  const { source, terrain, catchment, pond_site, alternative_sites, warnings } = result;
+  const {
+    source, terrain, catchment, pond_site, alternative_sites, warnings,
+    watercourses, channel_structures,
+  } = result;
   const surveyed = source.kind === 'contour_file';
   const catchmentArea = area(catchment.area_m2);
   const sites = [pond_site, ...alternative_sites];
@@ -90,6 +93,10 @@ export default function ReportPanel({ result, selected, onSelect }: Props) {
           <Row label="Ground level" value={`${num(pond_site.elevation_m, 1)} m`} />
           <Row label="Slope" value={`${num(pond_site.slope_deg, 1)}°`} />
           <Row label="Natural hollow" value={`${num(pond_site.depression_depth_m, 2)} m deep`} />
+          <Row
+            label="Above the drainage line"
+            value={`${num(pond_site.height_above_drainage_m, 1)} m`}
+          />
           <Row label="Spills at" value={`${num(pond_site.storage.spill_elevation_m, 1)} m`} />
           <Row label="Water surface" value={`${area(pond_site.storage.surface_area_m2).value} ${area(pond_site.storage.surface_area_m2).unit}`} />
           <Row label="Storage" value={volume(pond_site.storage.volume_m3)} />
@@ -124,13 +131,77 @@ export default function ReportPanel({ result, selected, onSelect }: Props) {
               <span>
                 <span className="where">{coords(site.latitude, site.longitude)}</span>
                 <br />
-                {num(site.elevation_m, 1)} m · {num(site.slope_deg, 1)}° · {volume(site.storage.volume_m3)}
+                {num(site.elevation_m, 1)} m · {num(site.height_above_drainage_m, 1)} m above drainage ·{' '}
+                {volume(site.storage.volume_m3)}
               </span>
               <span className="score">{site.score}</span>
             </button>
           ))}
         </section>
       )}
+
+      {channel_structures.length > 0 && (
+        <section className="card">
+          <header>
+            <h2>Not ponds</h2>
+            <span className="eyebrow">{channel_structures.length} on drainage lines</span>
+          </header>
+          <p className="caption" style={{ marginTop: 0 }}>
+            These scored well on the terrain but more than{' '}
+            {num(watercourses.farm_pond_max_catchment_ha)} ha drains through them, or one ordinary
+            storm would fill and overtop them. Either way the water has to be passed on, not just
+            held — a waste weir or spillway, and the consent of whoever is downstream.
+          </p>
+          {channel_structures.map((site) => (
+            <div className="alt static" key={`bund-${site.rank}`}>
+              <span className="rank">B{site.rank}</span>
+              <span>
+                <span className="where">{coords(site.latitude, site.longitude)}</span>
+                <br />
+                {site.structure_label} · {num(site.upstream_hectares, 1)} ha upstream ·{' '}
+                {volume(site.storage.volume_m3)}
+              </span>
+              <span className="score">{site.score}</span>
+            </div>
+          ))}
+          <ul className="reasons">
+            {channel_structures[0].reasons.map((reason) => <li key={reason}>{reason}</li>)}
+          </ul>
+        </section>
+      )}
+
+      <section className="card">
+        <header>
+          <h2>Water already there</h2>
+          <span className="eyebrow">
+            <Waves size={12} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+            {num(watercourses.excluded_fraction * 100, 1)}% withheld
+          </span>
+        </header>
+        <dl className="rows">
+          <Row label="River channel" value={`${num(watercourses.river_hectares, 1)} ha`} />
+          <Row
+            label="Fed from off the map"
+            value={`${num(watercourses.truncated_hectares, 1)} ha`}
+          />
+          <Row label="Floodplain" value={`${num(watercourses.floodplain_hectares, 1)} ha`} />
+          <Row label="Nala (too big for a pond)" value={`${num(watercourses.nala_hectares, 1)} ha`} />
+          <Row label="Standing water" value={`${num(watercourses.still_water_hectares, 1)} ha`} />
+          <Row
+            label="Farm pond limit"
+            value={`up to ${num(watercourses.farm_pond_max_catchment_ha)} ha catchment`}
+          />
+          <Row
+            label="Counted as river"
+            value={`over ${num(watercourses.river_min_catchment_ha)} ha, plus ${num(watercourses.river_buffer_m)} m either side`}
+          />
+          <Row
+            label="Counted as floodplain"
+            value={`under ${num(watercourses.river_floodplain_hand_m)} m above a river, or ${num(watercourses.nala_bank_hand_m)} m above a nala`}
+          />
+        </dl>
+        <p className="caption">{watercourses.note}</p>
+      </section>
 
       <section className="card">
         <header>

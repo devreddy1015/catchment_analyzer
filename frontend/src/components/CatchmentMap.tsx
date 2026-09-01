@@ -51,6 +51,17 @@ const pin = (rank: number, primary: boolean) =>
     iconAnchor: [13, 24],
   });
 
+/** A bund is not a pond, so it must not look like one on the map — and it must
+ *  not be numbered like one either. Two series both counting from 1 put a "2" on
+ *  a drainage line and a "2" on a hillside, and the map stops being readable. */
+const bundPin = (rank: number) =>
+  L.divIcon({
+    className: '',
+    html: `<div class="pin bund"><b>B${rank}</b></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 26],
+  });
+
 /** The pin for a place chosen but not yet analysed. */
 const target = L.divIcon({
   className: '',
@@ -87,6 +98,9 @@ export default function CatchmentMap({
   const [showCatchment, setShowCatchment] = useState(true);
   const [showDrainage, setShowDrainage] = useState(true);
   const [showFlowPath, setShowFlowPath] = useState(true);
+  const [showRivers, setShowRivers] = useState(true);
+  const [showFloodplain, setShowFloodplain] = useState(true);
+  const [showBunds, setShowBunds] = useState(true);
   const [opacity, setOpacity] = useState(0.6);
 
   const sites = useMemo(
@@ -103,6 +117,12 @@ export default function CatchmentMap({
   }, [result]);
   const drainage = useMemo(() => {
     const f = result && feature(result, 'drainage_lines');
+    return f ? (f.geometry.coordinates as number[][][]).map(flip) : [];
+  }, [result]);
+  // The ground a pond was *not* offered on belongs on the map beside the ground
+  // it was; an exclusion nobody can see just looks like a missing answer.
+  const rivers = useMemo(() => {
+    const f = result && feature(result, 'excluded_watercourse');
     return f ? (f.geometry.coordinates as number[][][]).map(flip) : [];
   }, [result]);
 
@@ -155,9 +175,32 @@ export default function CatchmentMap({
             {showHillshade && (
               <ImageOverlay url={result.overlays.hillshade} bounds={box(result.overlays.bounds)} opacity={0.45} />
             )}
+            {showFloodplain && result.overlays.watercourse && (
+              <ImageOverlay
+                url={result.overlays.watercourse}
+                bounds={box(result.overlays.bounds)}
+                opacity={0.85}
+              />
+            )}
 
             {showDrainage && drainage.map((line, i) => (
               <Polyline key={i} positions={line} pathOptions={{ color: '#2f6fa8', weight: 1.1, opacity: 0.65 }} />
+            ))}
+
+            {showRivers && rivers.map((line, i) => (
+              <Polyline
+                key={`river-${i}`}
+                positions={line}
+                pathOptions={{ color: '#1b4f8a', weight: 5, opacity: 0.75, lineCap: 'round' }}
+              >
+                <Popup>
+                  <strong>Watercourse — excluded</strong><br />
+                  Drains more than {num(result.watercourses.river_min_catchment_ha)} ha, so this is a
+                  river rather than pond ground.<br />
+                  No site is offered here, nor within{' '}
+                  {num(result.watercourses.river_buffer_m)} m of it.
+                </Popup>
+              </Polyline>
             ))}
 
             {showCatchment && catchmentRing.length > 0 && (
@@ -176,6 +219,21 @@ export default function CatchmentMap({
             {showFlowPath && flowPath.length > 1 && (
               <Polyline positions={flowPath} pathOptions={{ color: '#b2542c', weight: 2.5, dashArray: '5 4' }} />
             )}
+
+            {showBunds && result.channel_structures.map((site) => (
+              <Marker
+                key={`bund-${site.rank}`}
+                position={[site.latitude, site.longitude]}
+                icon={bundPin(site.rank)}
+              >
+                <Popup>
+                  <strong>{site.structure_label}</strong><br />
+                  {coords(site.latitude, site.longitude)}<br />
+                  {num(site.upstream_hectares, 1)} ha drains here — too much for a farm pond<br />
+                  Holds {volume(site.storage.volume_m3)} before spilling
+                </Popup>
+              </Marker>
+            ))}
 
             {sites.map((site) => (
               <Marker
@@ -204,6 +262,9 @@ export default function CatchmentMap({
             ['Hillshade', showHillshade, setShowHillshade],
             ['Catchment', showCatchment, setShowCatchment],
             ['Drainage lines', showDrainage, setShowDrainage],
+            ['River channel', showRivers, setShowRivers],
+            ['Floodplain (excluded)', showFloodplain, setShowFloodplain],
+            ['Nala bunds', showBunds, setShowBunds],
             ['Longest flow path', showFlowPath, setShowFlowPath],
           ] as const).map(([label, value, set]) => (
             <label className="toggle" key={label}>
@@ -242,7 +303,10 @@ export default function CatchmentMap({
             <span className="swatch"><i className="area" style={{ background: 'rgba(20,107,107,0.3)', border: '1.5px solid #146b6b' }} /> Catchment</span>
             <span className="swatch"><i style={{ background: '#b2542c' }} /> Longest flow path</span>
             <span className="swatch"><i style={{ background: '#2f6fa8' }} /> Drainage lines</span>
+            <span className="swatch"><i style={{ background: '#1b4f8a', height: 5 }} /> River channel</span>
+            <span className="swatch"><i className="area" style={{ background: 'rgba(60,120,175,0.32)' }} /> Floodplain — excluded</span>
             <span className="swatch"><i style={{ background: '#b2542c', height: 11, width: 11, borderRadius: '50%' }} /> Pond sites</span>
+            <span className="swatch"><i style={{ background: 'transparent', border: '2px solid var(--river)', height: 10, width: 10, borderRadius: 2 }} /> Nala bunds</span>
           </div>
         </div>
       )}

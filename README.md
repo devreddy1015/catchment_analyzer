@@ -354,23 +354,73 @@ Each is normalised against the range present in *this* terrain, so the scores ad
 whatever map arrives. Sites are then taken best-first while keeping them spaced apart,
 so the result is a set of genuine alternatives rather than a cluster of neighbours.
 
-**You cannot store water in a river.** Cells that are really stream channel — lots of
-flow passing through, no hollow to hold it — are excluded before ranking, because
-damming one is a check dam or a weir: a different structure, with a spillway, a
-sediment problem and usually a permit.
+**You cannot store water in a river.** Before anything is scored, the map is split by
+how much land drains through each cell — in hectares, which means the same thing on
+every map:
 
-The interesting part is what counts as "no hollow". It cannot be a fixed number of
-centimetres. A hollow shallower than the source could record is not a shallow hollow,
-it is interpolation between two identical readings — and on a busy channel, a
-smoothing filter manufactures exactly that. So the bar is the terrain's own **vertical
-resolution**: the contour interval of a survey, or one metre for the integer-metre DEM
-tiles. Below that the map does not know whether anything is there, and a site cannot be
-justified by a number that carries no information.
+| Upstream catchment | What it is | What happens |
+|---|---|---|
+| under 25 ha | Farm pond ground | Ranked as a pond site |
+| 25 – 100 ha | Nala bund or percolation tank | Ranked separately, as that structure |
+| over 100 ha, plus 40 m either side | River channel | No structure proposed; drawn on the map as excluded |
 
-A site can still clear that bar and sit on a busy line. When the land above it delivers
-more in one ordinary storm than the hollow can hold — 50 mm by the same rational method
-used for yield — the response says so, in those words: it is a nala bund needing a
-spillway, not a farm pond.
+The thresholds come from how these structures are actually sized: the ICAR dryland
+manuals and the MGNREGA works schedule put a farm pond's catchment at roughly 1–10 ha,
+and past about 25 ha the water arriving in a storm has to be passed on rather than
+held, which is a spillway problem. Standing water already on the ground — flat, level
+to the limit of what the source can express, and larger than any farm pond — is
+excluded as well.
+
+**Size is only half of it — the other half is height.** A pond can sit two hundred
+metres from the channel and still be in the river, because what floods is the valley
+floor, and a valley floor is as wide as it is rather than as wide as a buffer. So every
+cell also carries its **height above nearest drainage** (HAND: follow the flow pointers
+downstream, find the first channel they reach, take the elevation difference). Ground
+standing less than 3 m above the river it drains into, or less than 1 m above its nala,
+is that channel's floodplain and is withheld.
+
+Distance is the wrong question and height is the right one: ground fifty metres from a
+river but eight metres above it is dry, and ground three hundred metres away but level
+with it is riverbed every monsoon. On the sample survey the flow model found 140 cells
+of channel — while the flat ground lying within a metre of its level was a fifth of the
+map, and *every* site the scoring picked was inside it. Nothing was on the blue line;
+everything was at the blue line's elevation. The exclusion is drawn on the map as a
+wash, because a river drawn as a line is a line, and the ground it floods is an area.
+
+The height test is never applied to the channels themselves: a nala is level with the
+river it runs into by construction, so measuring one against the other would delete
+every drainage line on a gentle gradient — and with it the bunds that are the whole
+alternative on offer.
+
+**Why hectares, and not a hollow's depth.** A wide river reads as a *deep* trench in an
+elevation model: the sensor returns its water surface rather than its bed, and noise,
+bridges and bank canopy all cut into it. So a rule of "busy but shallow" exempts
+precisely the rivers it exists to catch, and the deeper and more river-like the
+reading, the more certain the exemption. Nor can it be a percentile: a percentile calls
+a fixed share of *every* map a channel, so a map lying wholly inside one river basin
+still nominates the river bed, while a hillside with no stream on it still loses its
+busiest ground.
+
+The depth rule is still there, one layer down, for the small channels the size rule
+lets through: a gully carrying a lot of flow with no hollow deeper than the source
+could record is interpolation over a channel, not storage. The bar is the terrain's own
+**vertical resolution** — the contour interval of a survey, or one metre for the
+integer-metre DEM tiles — because below that the map does not know whether anything is
+there.
+
+**Nothing is dropped silently.** A place that is not a pond is still a place: nala-class
+sites come back under `channel_structures`, labelled as the bund or percolation tank
+they take, with the waste weir and the downstream consent that implies. The excluded
+river is drawn on the map. And a hollow that one ordinary storm would fill and overtop
+— 50 mm by the same rational method used for yield — is moved into that list too,
+rather than being ranked as the best farm pond on the map with a note saying it is a
+nala bund.
+
+**What this cannot tell you** is whether a channel runs all year. A perennial river and
+a monsoon nala are the same trench in an elevation model; only the flow regime separates
+them, and that is not in the data. The classes are cut by size, which is conservative
+and checkable. Knowing a river *by name* would need hydrography — OpenStreetMap
+waterways, HydroSHEDS, India-WRIS — which this does not use.
 
 **5 · Delineate the catchment.** Walking the flow pointers *upstream* from the chosen
 site collects every cell that drains to it. Area is the cell count times the cell area;

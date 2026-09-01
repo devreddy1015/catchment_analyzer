@@ -10,7 +10,9 @@ Everything here follows the standard raster hydrology chain:
 how deep a depression sits there, which pond siting uses directly.
 
 A catchment is then the set of cells that drain into a chosen outlet, found by
-walking the flow pointers upstream from that outlet.
+walking the flow pointers upstream from that outlet. Walking upstream from the
+whole drainage network at once instead gives ``height_above_drainage``, which is
+how far above the water a piece of ground stands.
 """
 from __future__ import annotations
 
@@ -146,12 +148,7 @@ def flow_accumulation(z: np.ndarray, direction: np.ndarray) -> np.ndarray:
 def upstream_cells(direction: np.ndarray, outlet: tuple[int, int]) -> set[tuple[int, int]]:
     """Every cell that drains to ``outlet``, found by walking flow pointers upstream."""
     rows, cols = direction.shape
-    receiver = _receiver_index(direction)
-
-    contributors: dict[int, list[int]] = {}
-    for flat, downstream in enumerate(receiver.ravel()):
-        if downstream >= 0:
-            contributors.setdefault(int(downstream), []).append(flat)
+    contributors = _contributors(direction)
 
     start = outlet[0] * cols + outlet[1]
     catchment = {start}
@@ -163,6 +160,87 @@ def upstream_cells(direction: np.ndarray, outlet: tuple[int, int]) -> set[tuple[
                 queue.append(source)
 
     return {divmod(flat, cols) for flat in catchment}
+
+
+def _contributors(direction: np.ndarray) -> dict[int, list[int]]:
+    """For each cell, the flat indices of the cells that drain directly into it."""
+    contributors: dict[int, list[int]] = {}
+    for flat, downstream in enumerate(_receiver_index(direction).ravel()):
+        if downstream >= 0:
+            contributors.setdefault(int(downstream), []).append(flat)
+    return contributors
+
+
+def trunk_upstream(accumulation: np.ndarray, direction: np.ndarray,
+                   start: tuple[int, int]) -> list[tuple[int, int]]:
+    """Walk up the main channel from a cell, always taking the largest feeder.
+
+    At every junction the bigger of the two branches is the same watercourse
+    continuing and the smaller is a tributary joining it, so following the
+    largest contributor traces one river rather than wandering into its
+    headwaters. The walk ends where the water does: on a hilltop, or at the edge
+    of the map, and which of the two it is matters a great deal.
+    """
+    cols = direction.shape[1]
+    contributors = _contributors(direction)
+    flat_accumulation = accumulation.ravel()
+
+    flat = start[0] * cols + start[1]
+    path = [flat]
+    seen = {flat}
+    while True:
+        feeders = contributors.get(flat)
+        if not feeders:
+            break
+        flat = max(feeders, key=lambda i: flat_accumulation[i])
+        if flat in seen:
+            break
+        seen.add(flat)
+        path.append(flat)
+
+    return [divmod(f, cols) for f in path]
+
+
+def height_above_drainage(z: np.ndarray, direction: np.ndarray, network: np.ndarray) -> np.ndarray:
+    """How far each cell stands above the drainage line its own water reaches.
+
+    HAND, the height above nearest drainage (Rennó et al. 2008; Nobre et al.
+    2011). Following the flow pointers downstream from a cell, the first cell of
+    ``network`` they meet is the channel that cell belongs to, and the elevation
+    difference between the two is the answer.
+
+    Distance to the nearest channel says almost nothing about whether water
+    reaches a place — ground fifty metres from a river but eight metres above it
+    is dry, and ground three hundred metres away but level with it floods. Height
+    above the channel a cell actually drains into is the thing that separates
+    them, which is why this is the standard index for floodplain extent.
+
+    Walking upstream from the network reaches every cell exactly once and needs
+    no elevation ordering: the first network cell downstream of a cell is, by
+    construction, the one its receiver already found. Cells whose water leaves
+    the map without meeting the network come back as ``inf`` — unknown, which is
+    not the same as zero.
+    """
+    rows, cols = z.shape
+    reference = np.full(z.size, -1, dtype=np.int64)
+
+    seeds = np.flatnonzero(network.ravel())
+    reference[seeds] = seeds
+
+    contributors = _contributors(direction)
+    queue = deque(int(seed) for seed in seeds)
+    while queue:
+        downstream = queue.popleft()
+        for source in contributors.get(downstream, ()):
+            if reference[source] < 0:
+                reference[source] = reference[downstream]
+                queue.append(source)
+
+    flat_z = z.ravel()
+    height = np.full(z.size, np.inf)
+    reached = reference >= 0
+    height[reached] = flat_z[reached] - flat_z[reference[reached]]
+    return np.maximum(height, 0.0).reshape(rows, cols)
 
 
 def longest_flow_path(grid: ElevationGrid, direction: np.ndarray, cells: set[tuple[int, int]]) -> list[list[float]]:
@@ -289,22 +367,22 @@ def delineate(grid: ElevationGrid, direction: np.ndarray, outlet: tuple[int, int
     )
 
 
-def stream_network(grid: ElevationGrid, direction: np.ndarray, accumulation: np.ndarray,
-                   threshold_fraction: float = 0.01) -> list[list[list[float]]]:
-    """Drainage lines: cells whose upstream area exceeds a share of the map,
-    traced downstream into polylines for display."""
-    rows, cols = grid.shape
-    threshold = max(5, int(threshold_fraction * rows * cols))
-    is_stream = accumulation >= threshold
+def trace_lines(grid: ElevationGrid, direction: np.ndarray, mask: np.ndarray) -> list[list[list[float]]]:
+    """Follow the flow pointers through a set of cells, as (lon, lat) polylines.
 
-    visited = np.zeros_like(is_stream)
+    Any boolean selection of cells that lies along the drainage network — the
+    stream network, or the reach classed as river — comes out as lines a map can
+    draw, rather than as a scatter of squares.
+    """
+    rows, cols = grid.shape
+    visited = np.zeros_like(mask)
     segments: list[list[list[float]]] = []
 
-    for r, c in zip(*np.nonzero(is_stream)):
+    for r, c in zip(*np.nonzero(mask)):
         if visited[r, c]:
             continue
         points: list[list[float]] = []
-        while 0 <= r < rows and 0 <= c < cols and is_stream[r, c]:
+        while 0 <= r < rows and 0 <= c < cols and mask[r, c]:
             lat, lon = grid.point_at(r, c)
             points.append([round(lon, 6), round(lat, 6)])
             if visited[r, c]:
@@ -319,3 +397,12 @@ def stream_network(grid: ElevationGrid, direction: np.ndarray, accumulation: np.
             segments.append(points)
 
     return segments
+
+
+def stream_network(grid: ElevationGrid, direction: np.ndarray, accumulation: np.ndarray,
+                   threshold_fraction: float = 0.01) -> list[list[list[float]]]:
+    """Drainage lines: cells whose upstream area exceeds a share of the map,
+    traced downstream into polylines for display."""
+    rows, cols = grid.shape
+    threshold = max(5, int(threshold_fraction * rows * cols))
+    return trace_lines(grid, direction, accumulation >= threshold)

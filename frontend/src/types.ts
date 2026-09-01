@@ -59,6 +59,9 @@ export interface Storage {
   volume_m3: number;
 }
 
+/** What can actually be built at a place, which is not always a pond. */
+export type Structure = 'farm_pond' | 'nala';
+
 export interface Site {
   rank: number;
   latitude: number;
@@ -67,11 +70,31 @@ export interface Site {
   slope_deg: number;
   depression_depth_m: number;
   upstream_cells: number;
+  upstream_hectares: number;
+  height_above_drainage_m: number;
+  structure: Structure;
+  structure_label: string;
   score: number;
   rating: string;
   score_breakdown: Record<string, number>;
   storage: Storage;
   reasons: string[];
+}
+
+/** Ground withheld from pond siting because water is already using it. */
+export interface Watercourses {
+  farm_pond_max_catchment_ha: number;
+  river_min_catchment_ha: number;
+  river_buffer_m: number;
+  river_floodplain_hand_m: number;
+  nala_bank_hand_m: number;
+  river_hectares: number;
+  truncated_hectares: number;
+  floodplain_hectares: number;
+  nala_hectares: number;
+  still_water_hectares: number;
+  excluded_fraction: number;
+  note: string;
 }
 
 export interface Runoff {
@@ -101,7 +124,12 @@ export interface Catchment {
   runoff: Runoff;
 }
 
-export interface Overlays { elevation: string; hillshade: string; bounds: Bounds }
+export interface Overlays {
+  elevation: string;
+  hillshade: string;
+  watercourse: string;
+  bounds: Bounds;
+}
 
 export interface Options {
   resolution: number;
@@ -128,6 +156,8 @@ export interface Analysis {
   pond_site: Site;
   catchment: Catchment;
   alternative_sites: Site[];
+  watercourses: Watercourses;
+  channel_structures: Site[];
   overlays: Overlays;
   geojson: { type: 'FeatureCollection'; features: GeoFeature[] };
   warnings: string[];

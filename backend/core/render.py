@@ -1,8 +1,14 @@
 """Render the elevation grid to PNG overlays the map can drape over the terrain.
 
-Two images, both aligned to the grid's bounding box so a web map can place them
-directly: a hypsometric tint (low ground green through high ground white) and a
-hillshade, which is what actually makes the landform readable.
+Three images, all aligned to the grid's bounding box so a web map can place them
+directly: a hypsometric tint (low ground green through high ground white), a
+hillshade, which is what actually makes the landform readable, and a wash over
+the ground the water has already claimed.
+
+The last one exists because an exclusion nobody can see looks like a missing
+answer. A river drawn as a line is a line; the ground it floods is an area, and
+the difference between them is the whole point — a pond can sit fifty metres from
+the channel and still be in the river.
 """
 from __future__ import annotations
 
@@ -63,3 +69,32 @@ def prune(directory: Path, keep: int) -> None:
     files = sorted(directory.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True)
     for stale in files[keep:]:
         stale.unlink(missing_ok=True)
+
+
+# The wash over ground the water uses. Deliberately not the blue of the drainage
+# lines: those are where water runs, this is where it stands.
+_WATERCOURSE_COLOURS = {
+    "river": (27, 79, 138, 150),
+    "floodplain": (60, 120, 175, 80),
+    "nala": (90, 140, 120, 110),
+    "still_water": (20, 60, 110, 170),
+}
+
+
+def watercourse_png(masks: dict[str, np.ndarray], path: Path) -> None:
+    """Ground withheld from pond siting, as a translucent wash.
+
+    Painted least specific first, so a nala drawn over its own floodplain and a
+    river drawn over both come out on top — the same order in which the classes
+    override one another when a single cell is named.
+    """
+    shape = next(iter(masks.values())).shape
+    rgba = np.zeros((*shape, 4), dtype=np.uint8)
+
+    for name in ("floodplain", "nala", "still_water", "river"):
+        mask = masks.get(name)
+        if mask is None or not mask.any():
+            continue
+        rgba[mask] = _WATERCOURSE_COLOURS[name]
+
+    Image.fromarray(rgba, mode="RGBA").save(path, "PNG")

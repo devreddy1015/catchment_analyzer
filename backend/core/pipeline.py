@@ -24,9 +24,9 @@ import numpy as np
 from ..config import settings
 from ..models import (
     AnalysisOptions, Bounds, CatchmentAnalysis, CatchmentInfo, GridInfo, Overlays,
-    Point, RunoffInfo, SiteInfo, SourceInfo, StorageInfo, TerrainInfo,
+    Point, RunoffInfo, SiteInfo, SourceInfo, StorageInfo, TerrainInfo, WatercourseInfo,
 )
-from . import elevation_api, hydrology, kml, render, siting
+from . import elevation_api, hydrology, kml, render, siting, watercourse
 from .geo import bbox_around, haversine_m
 from .grid import ElevationGrid, build_grid
 from .siting import PondSite
@@ -51,12 +51,19 @@ def _time_of_concentration_min(flow_path_m: float, gradient: float) -> float:
 
 
 def _runoff(area_m2: float, coefficient: float, rainfall_mm: float | None) -> RunoffInfo:
-    """Rational method: runoff volume = rainfall depth x area x coefficient."""
-    per_mm = area_m2 * coefficient / 1000.0
+    """Rational method: runoff volume = rainfall depth x area x coefficient.
+
+    The volume is worked out from the *reported* yield rather than the full
+    precision one, so that multiplying the two numbers in the response by hand
+    reproduces the third. On a small catchment the yield is a couple of cubic
+    metres per millimetre, where rounding for display is a fraction of a percent
+    — small, but enough that the printed figures would otherwise disagree.
+    """
+    per_mm = round(area_m2 * coefficient / 1000.0, 2)
     return RunoffInfo(
         method="Rational method (V = P x A x C)",
         runoff_coefficient=round(coefficient, 3),
-        yield_m3_per_mm=round(per_mm, 2),
+        yield_m3_per_mm=per_mm,
         rainfall_mm=rainfall_mm,
         runoff_m3=round(per_mm * rainfall_mm, 1) if rainfall_mm else None,
     )
@@ -71,6 +78,10 @@ def _site_info(site: PondSite) -> SiteInfo:
         slope_deg=site.slope_deg,
         depression_depth_m=site.depression_depth_m,
         upstream_cells=site.upstream_cells,
+        upstream_hectares=site.upstream_hectares,
+        height_above_drainage_m=site.height_above_drainage_m,
+        structure=site.structure,
+        structure_label=site.structure_label,
         score=site.score,
         rating=site.rating,
         score_breakdown=site.component_scores,
@@ -93,7 +104,8 @@ def _feature(geometry_type: str, coordinates, properties: dict) -> dict:
 
 
 def _build_geojson(catchment: hydrology.Catchment, sites: list[PondSite],
-                   drainage: list[list[list[float]]]) -> dict:
+                   drainage: list[list[list[float]]], rivers: list[list[list[float]]],
+                   channel_structures: list[PondSite], courses: watercourse.Watercourses) -> dict:
     features = [
         _feature("Polygon", [catchment.boundary], {
             "type": "catchment",
@@ -109,8 +121,22 @@ def _build_geojson(catchment: hydrology.Catchment, sites: list[PondSite],
             "rating": site.rating,
             "elevation_m": site.elevation_m,
             "storage_volume_m3": site.storage.volume_m3,
+            "upstream_hectares": site.upstream_hectares,
         })
         for site in sites
+    ]
+    features += [
+        _feature("Point", [site.longitude, site.latitude], {
+            "type": "channel_structure",
+            "rank": site.rank,
+            "score": site.score,
+            "rating": site.rating,
+            "structure": site.structure,
+            "structure_label": site.structure_label,
+            "upstream_hectares": site.upstream_hectares,
+            "storage_volume_m3": site.storage.volume_m3,
+        })
+        for site in channel_structures
     ]
     if catchment.flow_path:
         features.append(_feature("LineString", catchment.flow_path, {
@@ -119,22 +145,40 @@ def _build_geojson(catchment: hydrology.Catchment, sites: list[PondSite],
         }))
     if drainage:
         features.append(_feature("MultiLineString", drainage, {"type": "drainage_lines"}))
+    if rivers:
+        # Drawn so the exclusion is visible rather than merely applied: the ground
+        # a pond was not offered on should be on the map next to the ones it was.
+        features.append(_feature("MultiLineString", rivers, {
+            "type": "excluded_watercourse",
+            "reason": f"Drains more than {courses.river_min_ha:g} ha — a river, not pond ground",
+            "min_catchment_ha": courses.river_min_ha,
+            "buffer_m": courses.buffer_m,
+        }))
 
     return {"type": "FeatureCollection", "features": features}
 
 
-def _write_overlays(grid: ElevationGrid, analysis_id: str) -> Overlays:
+def _write_overlays(grid: ElevationGrid, analysis_id: str,
+                    courses: watercourse.Watercourses) -> Overlays:
     storage = Path(settings.STORAGE_DIR)
     elevation_name = f"{analysis_id}_elevation.png"
     hillshade_name = f"{analysis_id}_hillshade.png"
+    watercourse_name = f"{analysis_id}_watercourse.png"
 
     render.elevation_png(grid.z, storage / elevation_name)
     render.hillshade_png(grid.z, grid.cell_size_m, storage / hillshade_name)
+    render.watercourse_png({
+        "river": courses.river,
+        "floodplain": courses.floodplain,
+        "nala": courses.nala,
+        "still_water": courses.still_water,
+    }, storage / watercourse_name)
     render.prune(storage, keep=settings.MAX_STORED_OVERLAYS)
 
     return Overlays(
         elevation=f"/storage/{elevation_name}",
         hillshade=f"/storage/{hillshade_name}",
+        watercourse=f"/storage/{watercourse_name}",
         bounds=_bounds(grid.south, grid.west, grid.north, grid.east),
     )
 
@@ -147,6 +191,91 @@ def _clamp_resolution(resolution: int | None) -> int:
     if resolution is None:
         return settings.DEFAULT_RESOLUTION
     return int(np.clip(resolution, settings.MIN_RESOLUTION, settings.MAX_RESOLUTION))
+
+
+WATERCOURSE_NOTE = (
+    "Two questions decide this, not one. How much land drains through a place, in "
+    "hectares, separates a farm pond's catchment from a nala's and a nala's from a "
+    "river's. How far the ground stands above the channel it drains into — not how far "
+    "away that channel is — separates the valley floor from the shoulder above it. The "
+    "second matters most: a pond in a floodplain is not on the river at all, it is "
+    "merely at the river's level, and that is where the water goes in a wet year. "
+    "Depth of hollow decides nothing, because a wide river reads as a deep trench when "
+    "the sensor returns its water surface rather than its bed. What no elevation model "
+    "can settle is whether a channel runs all year: a perennial river and a monsoon "
+    "nala are the same trench in the data. Treat all of it as a size-and-height rule, "
+    "and go and look at the ground."
+)
+
+
+def _watercourse_info(courses: watercourse.Watercourses, grid: ElevationGrid) -> WatercourseInfo:
+    return WatercourseInfo(
+        farm_pond_max_catchment_ha=courses.farm_pond_max_ha,
+        river_min_catchment_ha=courses.river_min_ha,
+        river_buffer_m=courses.buffer_m,
+        river_floodplain_hand_m=watercourse.RIVER_FLOODPLAIN_HAND_M,
+        nala_bank_hand_m=watercourse.NALA_BANK_HAND_M,
+        note=WATERCOURSE_NOTE,
+        **courses.summary(grid.cell_area_m2),
+    )
+
+
+def _watercourse_warnings(courses: watercourse.Watercourses, grid: ElevationGrid,
+                          channel_structures: list[PondSite]) -> list[str]:
+    """Say what was withheld and why, rather than quietly dropping it."""
+    summary = courses.summary(grid.cell_area_m2)
+    notes: list[str] = []
+
+    if summary["river_hectares"] > 0:
+        notes.append(
+            f"{summary['river_hectares']:,.0f} ha was excluded as river and floodplain: it drains "
+            f"more than {courses.river_min_ha:g} ha, so a farm pond is the wrong structure and no "
+            f"structure is proposed there. It is drawn on the map as an excluded watercourse."
+        )
+    if summary["truncated_hectares"] > 0:
+        notes.append(
+            f"{summary['truncated_hectares']:,.0f} ha is channel whose water comes from outside "
+            f"this map, so its catchment could not be measured — only bounded from below. Flow "
+            f"accumulation counts the cells it has, and a river draining a whole district reads "
+            f"as a few hundred hectares in a window a few kilometres across. It is treated as "
+            f"river. To size anything on it, analyse an area that contains its catchment."
+        )
+    if summary["floodplain_hectares"] > 0:
+        notes.append(
+            f"{summary['floodplain_hectares']:,.0f} ha was excluded as floodplain: it stands less "
+            f"than {watercourse.RIVER_FLOODPLAIN_HAND_M:g} m above the river it drains into, or "
+            f"less than {watercourse.NALA_BANK_HAND_M:g} m above its nala. Ground at the water's "
+            f"own level is riverbed in a wet year, however far from the channel it looks on a map."
+        )
+    if summary["still_water_hectares"] > 0:
+        notes.append(
+            f"{summary['still_water_hectares']:,.0f} ha reads as standing water already — flat, "
+            f"level and too large to be a farm pond — and was excluded. Check it against imagery; "
+            f"a genuinely level field can look the same to an elevation model."
+        )
+    if channel_structures:
+        notes.append(
+            f"{len(channel_structures)} place(s) on drainage lines above "
+            f"{courses.farm_pond_max_ha:g} ha are listed under channel_structures. They are nala "
+            f"bunds or percolation tanks, needing a waste weir and downstream consent, not farm ponds."
+        )
+    if summary["excluded_fraction"] > 0.5:
+        notes.append(
+            f"{summary['excluded_fraction']:.0%} of this map is watercourse or open water. Very "
+            f"little of it is farm-pond ground; consider looking upslope instead."
+        )
+    return notes
+
+
+def _nothing_found(courses: watercourse.Watercourses) -> str:
+    """Why the search came back empty — the two reasons are not the same problem."""
+    if courses.share(courses.excluded) > 0.5:
+        return (
+            "No viable pond site was found: most of this area is river, floodplain or open "
+            "water, which is not ground a farm pond can be built on. Try an area upslope of "
+            "the main drainage line."
+        )
+    return "No viable pond site was found in this terrain."
 
 
 def _report(grid: ElevationGrid, source: SourceInfo, options: AnalysisOptions,
@@ -162,16 +291,24 @@ def _report(grid: ElevationGrid, source: SourceInfo, options: AnalysisOptions,
     accumulation = hydrology.flow_accumulation(routed, direction)
     depths = hydrology.depression_depth(grid.z)
 
-    # 2. Rank pond sites, then delineate the catchment of the best one.
-    sites = siting.rank_sites(grid, accumulation, direction, depths, max_sites=options.max_sites)
+    # 2. Work out what the water is already doing, so a pond is not proposed on
+    #    ground a river, a tank or an oversized nala has already claimed.
+    courses = watercourse.classify(grid, accumulation, direction)
+
+    # 3. Rank pond sites, then delineate the catchment of the best one.
+    selection = siting.select(grid, accumulation, direction, depths,
+                              max_sites=options.max_sites, watercourses=courses)
+    sites = selection.ponds
     if not sites:
-        raise ValueError("No viable pond site was found in this terrain.")
+        raise ValueError(_nothing_found(courses))
 
     best = sites[0]
     catchment = hydrology.delineate(grid, direction, (best.row, best.col))
     drainage = hydrology.stream_network(grid, direction, accumulation, STREAM_THRESHOLD_FRACTION)
+    rivers = hydrology.trace_lines(grid, direction, courses.river_core)
+    warnings = warnings + _watercourse_warnings(courses, grid, selection.channel_structures)
 
-    # 3. Assemble the response.
+    # 4. Assemble the response.
     rows, cols = grid.shape
 
     return CatchmentAnalysis(
@@ -218,8 +355,11 @@ def _report(grid: ElevationGrid, source: SourceInfo, options: AnalysisOptions,
             runoff=_runoff(catchment.area_m2, options.runoff_coefficient, options.rainfall_mm),
         ),
         alternative_sites=[_site_info(site) for site in sites[1:]],
-        overlays=_write_overlays(grid, analysis_id),
-        geojson=_build_geojson(catchment, sites, drainage),
+        watercourses=_watercourse_info(courses, grid),
+        channel_structures=[_site_info(site) for site in selection.channel_structures],
+        overlays=_write_overlays(grid, analysis_id, courses),
+        geojson=_build_geojson(catchment, sites, drainage, rivers,
+                               selection.channel_structures, courses),
         warnings=warnings,
     )
 

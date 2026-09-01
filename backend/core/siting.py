@@ -7,15 +7,29 @@ Every cell is scored on four things a contour map can actually answer:
     slope       how flat the ground is, which sets excavation cost
     elevation   how low it sits, so water arrives by gravity
 
-The weighted sum becomes a 0-100 score. Cells that are really an active stream
-channel — a lot of flow passing through but no hollow to hold it — are removed
-first: damming one is a check dam, a different structure with different
-engineering, not a farm pond. Sites are then taken best-first while keeping
-them spaced apart, so the result is a set of genuine alternatives rather than a
-cluster of neighbouring cells.
+The weighted sum becomes a 0-100 score. Before any of it is used, the map is
+split by :mod:`.watercourse` into ground a farm pond may sit on and ground it may
+not: a river and its floodplain, standing water already on the ground, and
+drainage lines carrying more than a farm pond's catchment. That split is by
+upstream area in hectares, so it does not depend on how much of this particular
+map happens to be river.
 
-No thresholds here are tied to a particular map: scores are normalised against
-the range present in whatever terrain was uploaded.
+A cell that is a stream bed but too small to be a nala is dropped as well: a lot
+of flow passing through and no hollow deeper than the source could actually
+record is interpolation over a channel, not storage.
+
+Nothing is thrown away silently. Nala-class cells are still ranked, separately,
+and returned as the structure they really are — a bund or a percolation tank,
+with a waste weir — so the answer is "not a pond, this instead" rather than an
+empty map. Only the river itself and open water carry no proposal at all.
+
+Sites are then taken best-first while keeping them spaced apart, so the result is
+a set of genuine alternatives rather than a cluster of neighbouring cells.
+
+No thresholds in the *scoring* are tied to a particular map: scores are
+normalised against the range present in whatever terrain was uploaded. The
+thresholds that decide what a place *is* are in :mod:`.watercourse`, in hectares,
+and are the same everywhere.
 """
 from __future__ import annotations
 
@@ -25,6 +39,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .grid import ElevationGrid
+from .watercourse import FARM_POND, NALA, Watercourses
 
 # Score weights; they are normalised, so relative size is what matters.
 WEIGHTS = {"depression": 0.30, "catchment": 0.30, "slope": 0.25, "elevation": 0.15}
@@ -33,10 +48,10 @@ WEIGHTS = {"depression": 0.30, "catchment": 0.30, "slope": 0.25, "elevation": 0.
 # steep enough that excavation and embankment costs climb sharply.
 SLOPE_HALF_SCORE_DEG = 8.0
 
-# A cell counts as an active channel when its upstream area is in the top
+# A cell counts as a bare stream bed when its upstream area is in the top
 # CHANNEL_FLOW_PERCENTILE of the map yet holds too little standing depth to be
-# storage. Damming one of these is a check dam or a weir — a different structure,
-# with a spillway, a sediment problem and usually a permit — not a farm pond.
+# storage. This is the small-channel case: gullies and first-order streams below
+# the nala threshold, which the hectare rule in `watercourse` lets through.
 #
 # "Too little" cannot be a fixed number of centimetres. A hollow shallower than
 # the source could record is not a shallow hollow, it is interpolation between
@@ -44,6 +59,11 @@ SLOPE_HALF_SCORE_DEG = 8.0
 # filter manufactures. So the bar is the coarser of a floor and the terrain's own
 # vertical resolution: the contour interval, or one metre for integer-metre DEM
 # tiles. Below that the map simply does not know whether anything is there.
+#
+# Note what this rule cannot do, and why `watercourse` exists: a *wide* river
+# reads as a deep trench, because the sensor sees its water surface and because
+# noise, bridges and bank canopy cut into it. Being deep, it is exempted here.
+# The size rule catches it first, and must, or this one would wave it through.
 CHANNEL_FLOW_PERCENTILE = 95.0
 CHANNEL_MIN_DEPRESSION_M = 0.30
 
@@ -55,7 +75,23 @@ CHANNEL_MIN_DEPRESSION_M = 0.30
 STORM_TEST_MM = 50.0
 STORM_TEST_RUNOFF_C = 0.4
 
+# How many alternative structures to offer on drainage lines too big for a pond.
+# Enough to show there is a choice; not so many that they crowd out the answer.
+MAX_CHANNEL_STRUCTURES = 3
+
+# How many candidates to examine to fill `max_sites` ponds. Some of what scores
+# well turns out, once its storage has actually been worked out, to be a bund
+# rather than a pond — and that is only knowable cell by cell, after the flood
+# fill. Looking at several times as many leaves room to set those aside without
+# the answer coming up short.
+CANDIDATE_MULTIPLE = 4
+
 RATINGS = ((70.0, "Excellent"), (55.0, "Good"), (40.0, "Moderate"), (0.0, "Marginal"))
+
+STRUCTURE_LABELS = {
+    FARM_POND: "Farm pond",
+    NALA: "Nala bund / percolation tank",
+}
 
 
 @dataclass
@@ -84,6 +120,21 @@ class PondSite:
     component_scores: dict[str, float]
     storage: StorageEstimate
     reasons: list[str] = field(default_factory=list)
+    structure: str = FARM_POND
+    upstream_hectares: float = 0.0
+    height_above_drainage_m: float | None = None
+
+    @property
+    def structure_label(self) -> str:
+        return STRUCTURE_LABELS.get(self.structure, self.structure)
+
+
+@dataclass
+class SiteSelection:
+    """What the terrain offers, split by the structure each place actually takes."""
+
+    ponds: list[PondSite]
+    channel_structures: list[PondSite]
 
 
 def _normalise(values: np.ndarray) -> np.ndarray:
@@ -158,8 +209,9 @@ def _describe(components: dict[str, float], site_depth_m: float, storage: Storag
     if components["catchment"] < 0.3:
         reasons.append("Caution: little land drains here, so inflow will be limited")
     if storage.volume_m3 > 0 and storm_m3 > storage.volume_m3:
-        # It cleared the channel test, so the hollow is real — but the land above
-        # it delivers more in one storm than the hollow can keep.
+        # It cleared the watercourse tests, so the hollow is real and the
+        # catchment is farm-pond sized — but the land above it still delivers
+        # more in one storm than the hollow can keep.
         reasons.append(
             f"Caution: {upstream_ha:,.0f} ha drains through here, and 50 mm of rain on it "
             f"yields about {storm_m3:,.0f} m³ against the {storage.volume_m3:,.0f} m³ this "
@@ -169,53 +221,93 @@ def _describe(components: dict[str, float], site_depth_m: float, storage: Storag
     return reasons
 
 
+def _describe_channel(storage: StorageEstimate, upstream_ha: float, storm_m3: float,
+                      farm_pond_max_ha: float) -> list[str]:
+    """Why this place is a bund rather than a pond, and what that entails.
+
+    Two things send a place here and they deserve different first sentences: a
+    catchment larger than a farm pond is sized for, or a hollow that one ordinary
+    storm fills and overtops. The second is the same verdict reached by measuring
+    rather than by the size rule, and it used to be printed as a caution on a site
+    that was still being recommended as a pond.
+    """
+    if upstream_ha >= farm_pond_max_ha:
+        opening = (
+            f"{upstream_ha:,.0f} ha drains through here — more than the {farm_pond_max_ha:g} ha a "
+            f"farm pond is sized for, so this is a nala bund or percolation tank, not a pond"
+        )
+    else:
+        opening = (
+            f"50 mm of rain on the {upstream_ha:,.1f} ha above this point yields about "
+            f"{storm_m3:,.0f} m³, against the {storage.volume_m3:,.0f} m³ this hollow holds. It "
+            f"fills and spills in one ordinary storm, so it is a bund, not a pond"
+        )
+    reasons = [
+        opening,
+        f"50 mm of rain on that catchment yields about {storm_m3:,.0f} m³, so the structure "
+        f"has to pass water on, not just hold it: it needs a waste weir or spillway",
+    ]
+    if storage.volume_m3 > 0:
+        reasons.append(
+            f"The natural section fills to {storage.spill_elevation_m:g} m, covering "
+            f"{storage.surface_area_m2:,.0f} m² and holding about {storage.volume_m3:,.0f} m³ "
+            f"before it spills"
+        )
+    else:
+        reasons.append("No natural hollow here — the whole section would have to be impounded")
+    reasons.append(
+        "Check the downstream and submergence rights before going further; a bund on a "
+        "drainage line affects who gets water below it"
+    )
+    return reasons
+
+
 def _rating(score: float) -> str:
     return next(label for cutoff, label in RATINGS if score >= cutoff)
 
 
-def rank_sites(
-    grid: ElevationGrid,
-    accumulation: np.ndarray,
-    direction: np.ndarray,
-    depths: np.ndarray,
-    max_sites: int = 5,
-) -> list[PondSite]:
-    """Score the terrain and return the best-spaced candidate pond sites."""
-    rows, cols = grid.shape
-
-    depression = _normalise(depths)
-    catchment = _normalise(np.log1p(accumulation.astype(float)))
-    slope = _normalise(1.0 / (1.0 + grid.slope_deg / SLOPE_HALF_SCORE_DEG))
-    elevation = _normalise(-grid.z)
-
+def _score_layers(grid: ElevationGrid, accumulation: np.ndarray, depths: np.ndarray):
+    """The four normalised suitability layers and their weighted 0-100 sum."""
     components = {
-        "depression": depression,
-        "catchment": catchment,
-        "slope": slope,
-        "elevation": elevation,
+        "depression": _normalise(depths),
+        "catchment": _normalise(np.log1p(accumulation.astype(float))),
+        "slope": _normalise(1.0 / (1.0 + grid.slope_deg / SLOPE_HALF_SCORE_DEG)),
+        "elevation": _normalise(-grid.z),
     }
     total_weight = sum(WEIGHTS.values())
     score = sum(WEIGHTS[name] / total_weight * layer for name, layer in components.items()) * 100.0
+    return components, score
 
-    # Drop cells that are stream channel rather than storage.
+
+def _bare_stream_bed(grid: ElevationGrid, accumulation: np.ndarray, direction: np.ndarray,
+                     depths: np.ndarray) -> np.ndarray:
+    """Busy channel with no hollow the source could actually have measured."""
     holds_water = max(CHANNEL_MIN_DEPRESSION_M, grid.vertical_resolution_m)
-    channel = (
+    return (
         (accumulation >= np.percentile(accumulation, CHANNEL_FLOW_PERCENTILE))
         & (depths < holds_water)
         & (direction >= 0)
     )
-    score[channel] = 0.0
 
-    # Drop the outer ring: interpolation is least reliable there and flow
-    # directions point off the map.
+
+def _edge_mask(shape: tuple[int, int]) -> np.ndarray:
+    """The outer ring, where interpolation is least reliable and flow leaves the map."""
+    rows, cols = shape
     edge = max(2, min(rows, cols) // 40)
-    score[:edge, :] = score[-edge:, :] = 0.0
-    score[:, :edge] = score[:, -edge:] = 0.0
+    mask = np.zeros(shape, dtype=bool)
+    mask[:edge, :] = mask[-edge:, :] = True
+    mask[:, :edge] = mask[:, -edge:] = True
+    return mask
 
-    # Best first, keeping candidates apart. Ties break on catchment, then depth,
-    # then position, so the same input always yields the same output.
-    min_separation = max(3, min(rows, cols) // 8)
-    order = sorted(
+
+def _order(score: np.ndarray, accumulation: np.ndarray, depths: np.ndarray,
+           grid: ElevationGrid) -> list[int]:
+    """Every eligible cell, best first.
+
+    Ties break on catchment, then depth, then position, so the same input always
+    yields the same output.
+    """
+    return sorted(
         (int(i) for i in np.flatnonzero(score)),
         key=lambda i: (
             -score.flat[i],
@@ -226,22 +318,97 @@ def rank_sites(
         ),
     )
 
-    chosen: list[tuple[int, int]] = []
-    for flat in order:
-        r, c = divmod(flat, cols)
-        if all((r - pr) ** 2 + (c - pc) ** 2 >= min_separation ** 2 for pr, pc in chosen):
-            chosen.append((r, c))
-        if len(chosen) >= max_sites:
-            break
 
+def _spaced(cells: list[tuple[int, int]], candidate: tuple[int, int], separation: int) -> bool:
+    r, c = candidate
+    return all((r - pr) ** 2 + (c - pc) ** 2 >= separation ** 2 for pr, pc in cells)
+
+
+def _separation(shape: tuple[int, int]) -> int:
+    return max(3, min(shape) // 8)
+
+
+@dataclass
+class _Candidate:
+    """A cell worth considering, with the measurements that decide what it is."""
+
+    row: int
+    col: int
+    storage: StorageEstimate
+    storm_m3: float
+    upstream_ha: float
+    height_above_drainage_m: float | None = None
+
+    @property
+    def cell(self) -> tuple[int, int]:
+        return self.row, self.col
+
+    @property
+    def overtopped(self) -> bool:
+        """One ordinary storm fills this hollow and spills over it.
+
+        Then what is needed is a spillway, not an embankment. Only meaningful
+        where there is a natural hollow to overtop: a site that has to be dug
+        gets its capacity from the excavation, which this cannot see, so a bare
+        site is left to be judged on its catchment alone.
+        """
+        return self.storage.volume_m3 > 0 and self.storm_m3 > self.storage.volume_m3
+
+
+def _evaluate(grid: ElevationGrid, accumulation: np.ndarray, depths: np.ndarray,
+              cell: tuple[int, int], above_drainage: np.ndarray) -> _Candidate:
+    r, c = cell
+    height = float(above_drainage[r, c])
+    return _Candidate(
+        row=r,
+        col=c,
+        storage=natural_storage(grid, depths, cell),
+        storm_m3=_storm_inflow_m3(int(accumulation[r, c]), grid.cell_area_m2),
+        upstream_ha=float(accumulation[r, c]) * grid.cell_area_m2 / 10_000.0,
+        # Infinite means the water leaves the map without ever meeting a drainage
+        # line, so there is no channel this site stands above. That is unknown,
+        # and unknown reported as 0.0 would read as "level with the water" — the
+        # exact opposite of what it means.
+        height_above_drainage_m=height if np.isfinite(height) else None,
+    )
+
+
+def _pick(grid: ElevationGrid, accumulation: np.ndarray, depths: np.ndarray,
+          score: np.ndarray, limit: int, above_drainage: np.ndarray) -> list[_Candidate]:
+    """Best-scoring cells, taken in order while keeping them spaced apart."""
+    cols = score.shape[1]
+    separation = _separation(score.shape)
+
+    chosen: list[_Candidate] = []
+    taken: list[tuple[int, int]] = []
+    for flat in _order(score, accumulation, depths, grid):
+        cell = divmod(flat, cols)
+        if not _spaced(taken, cell, separation):
+            continue
+        taken.append(cell)
+        chosen.append(_evaluate(grid, accumulation, depths, cell, above_drainage))
+        if len(chosen) >= limit:
+            break
+    return chosen
+
+
+def _build(grid: ElevationGrid, accumulation: np.ndarray, depths: np.ndarray,
+           components: dict[str, np.ndarray], score: np.ndarray,
+           chosen: list[_Candidate], structure: str,
+           farm_pond_max_ha: float) -> list[PondSite]:
     sites: list[PondSite] = []
-    for rank, (r, c) in enumerate(chosen, start=1):
+    for rank, candidate in enumerate(chosen, start=1):
+        r, c = candidate.cell
         parts = {name: round(float(layer[r, c]), 3) for name, layer in components.items()}
-        storage = natural_storage(grid, depths, (r, c))
-        upstream_ha = float(accumulation[r, c]) * grid.cell_area_m2 / 10_000.0
-        storm_m3 = _storm_inflow_m3(int(accumulation[r, c]), grid.cell_area_m2)
         lat, lon = grid.point_at(r, c)
         site_score = round(float(score[r, c]), 1)
+        reasons = (
+            _describe(parts, float(depths[r, c]), candidate.storage,
+                      candidate.upstream_ha, candidate.storm_m3)
+            if structure == FARM_POND
+            else _describe_channel(candidate.storage, candidate.upstream_ha,
+                                   candidate.storm_m3, farm_pond_max_ha)
+        )
         sites.append(PondSite(
             rank=rank,
             row=r,
@@ -255,8 +422,97 @@ def rank_sites(
             score=site_score,
             rating=_rating(site_score),
             component_scores=parts,
-            storage=storage,
-            reasons=_describe(parts, float(depths[r, c]), storage, upstream_ha, storm_m3),
+            storage=candidate.storage,
+            reasons=reasons,
+            structure=structure,
+            upstream_hectares=round(candidate.upstream_ha, 2),
+            height_above_drainage_m=(
+                None if candidate.height_above_drainage_m is None
+                else round(candidate.height_above_drainage_m, 2)
+            ),
         ))
-
     return sites
+
+
+def rank_sites(
+    grid: ElevationGrid,
+    accumulation: np.ndarray,
+    direction: np.ndarray,
+    depths: np.ndarray,
+    max_sites: int = 5,
+    watercourses: Watercourses | None = None,
+) -> list[PondSite]:
+    """Score the terrain and return the best-spaced candidate farm-pond sites.
+
+    Cells that are river, standing water, a drainage line larger than a farm
+    pond's catchment, or a bare stream bed are removed before anything is chosen,
+    so the next-best genuine site is promoted rather than left in the shadow of a
+    watercourse it was never competing with.
+    """
+    return select(grid, accumulation, direction, depths, max_sites, watercourses).ponds
+
+
+def select(
+    grid: ElevationGrid,
+    accumulation: np.ndarray,
+    direction: np.ndarray,
+    depths: np.ndarray,
+    max_sites: int = 5,
+    watercourses: Watercourses | None = None,
+    max_channel_structures: int = MAX_CHANNEL_STRUCTURES,
+) -> SiteSelection:
+    """Rank pond sites, and separately rank the bunds the big channels would take.
+
+    Two things move a place out of the pond list. The size rule in
+    :mod:`.watercourse` handles ground the water has already claimed — river,
+    floodplain, standing water, a nala above a farm pond's catchment — and it can
+    be applied to the whole map at once. The storm test can only be applied cell
+    by cell, because it needs the hollow's actual volume, so candidates are
+    picked first and sorted afterwards. Both verdicts land in the same place: the
+    site is offered as the structure it really takes.
+    """
+    from . import watercourse as wc_module  # local: avoids a cycle at import time
+
+    if watercourses is None:
+        watercourses = wc_module.classify(grid, accumulation, direction)
+
+    components, score = _score_layers(grid, accumulation, depths)
+    edge = _edge_mask(grid.shape)
+    bare_bed = _bare_stream_bed(grid, accumulation, direction, depths)
+
+    pond_score = score.copy()
+    pond_score[watercourses.excluded | bare_bed | edge] = 0.0
+    above = watercourses.height_above_drainage
+    examined = _pick(grid, accumulation, depths, pond_score,
+                     max_sites * CANDIDATE_MULTIPLE, above)
+
+    ponds = [c for c in examined if not c.overtopped][:max_sites]
+    overtopped = [c for c in examined if c.overtopped]
+
+    # The nala class keeps its own ranking: it is a real answer, just not a pond.
+    # The river itself and open water get none — nothing responsible can be
+    # proposed on either from an elevation model alone.
+    channel_score = score.copy()
+    channel_score[~watercourses.nala] = 0.0
+    channel_score[edge] = 0.0
+    channels = _pick(grid, accumulation, depths, channel_score, max_channel_structures, above)
+
+    # A hollow one storm overtops is the same verdict the size rule reaches, just
+    # measured rather than assumed, so the two lists are one list. Ordering by
+    # score keeps it comparable with everything else on the map.
+    separation = _separation(grid.shape)
+    taken = [c.cell for c in channels]
+    for candidate in sorted(overtopped, key=lambda c: -score[c.cell]):
+        if len(channels) >= max_channel_structures:
+            break
+        if _spaced(taken, candidate.cell, separation):
+            taken.append(candidate.cell)
+            channels.append(candidate)
+    channels.sort(key=lambda c: -score[c.cell])
+
+    return SiteSelection(
+        ponds=_build(grid, accumulation, depths, components, pond_score, ponds,
+                     FARM_POND, watercourses.farm_pond_max_ha),
+        channel_structures=_build(grid, accumulation, depths, components, score, channels,
+                                  NALA, watercourses.farm_pond_max_ha),
+    )
