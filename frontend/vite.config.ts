@@ -19,8 +19,8 @@ function unreachable(res: ServerResponse): void {
       success: false,
       error: 'The API is not running.',
       detail:
-        'Cannot reach the backend on port 8000. Start it from the project root with ' +
-        '`.venv/bin/uvicorn backend.main:app --reload --port 8000`, or run `./dev.sh`, ' +
+        'Cannot reach the backend on port 5000. Start it from the project root with ' +
+        '`.venv/bin/uvicorn backend.main:app --reload --port 5000`, or run `./dev.sh`, ' +
         'which starts the API and this interface together.',
     }),
   );
@@ -28,7 +28,7 @@ function unreachable(res: ServerResponse): void {
 
 /** The API and the generated overlay images both live on the backend. */
 const backend = () => ({
-  target: 'http://localhost:8000',
+  target: 'http://localhost:5000',
   configure: (proxy: { on: (event: string, handler: (...args: never[]) => void) => void }) => {
     proxy.on('error', ((_error: Error, _request: unknown, res: ServerResponse) => {
       unreachable(res);
