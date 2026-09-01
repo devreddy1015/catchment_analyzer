@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 HOST=${HOST:-127.0.0.1}
-PORT=${PORT:-5000}
+PORT=${PORT:-5249}
 
 PY=${PY:-$([ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)}
 
