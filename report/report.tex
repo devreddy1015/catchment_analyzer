@@ -1,24 +1,19 @@
 %=======================================================================
 %  Catchment Analyzer -- Phase 1 Report
-%  Compile:  pdflatex report.tex  (run twice for the table of contents)
+%  Compile:  pdflatex report.tex   (run twice)
 %=======================================================================
 \documentclass[11pt,a4paper]{article}
 
 %----------------------------------------------------------- packages
 \usepackage[utf8]{inputenc}
 % OT1 deliberately, not T1: this TeX Live install ships Computer Modern as
-% scalable Type 1 outlines (cmr10.pfb) but the T1-encoded EC fonts only as
-% METAFONT bitmaps. OT1 therefore gives a sharper PDF and lets microtype's
-% font expansion work. If you build where lmodern is installed, you may
-% switch to \usepackage[T1]{fontenc}\usepackage{lmodern} for better output.
-\usepackage[a4paper,margin=25mm,headheight=15pt]{geometry}
+% scalable Type 1 outlines but the T1-encoded EC fonts only as bitmaps.
+\usepackage[a4paper,margin=24mm,headheight=15pt]{geometry}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
-\usepackage{longtable}
-\usepackage{colortbl}
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{titlesec}
@@ -31,733 +26,529 @@
 \usepackage[hidelinks]{hyperref}
 
 %----------------------------------------------------------- metadata
-\newcommand{\repourl}{https://github.com/devreddy1015/catchment\_analyzer}
 \newcommand{\repourlraw}{https://github.com/devreddy1015/catchment_analyzer}
-% >>> EDIT THIS ONE LINE with your deployed host before submitting <<<
-\newcommand{\apihost}{http://10.1.75.53:5249}
+% >>> If the host changes, edit this one line. <<<
+\newcommand{\apihost}{http://10.50.43.255:5249}
 \newcommand{\apiroute}{\apihost/api/analyzeContour}
 
 %----------------------------------------------------------- palette
 \definecolor{ink}{HTML}{1B2B34}
 \definecolor{water}{HTML}{1F6F8B}
-\definecolor{terrain}{HTML}{6B8E4E}
 \definecolor{clay}{HTML}{B5651D}
-\definecolor{mist}{HTML}{F4F6F7}
 \definecolor{rule}{HTML}{C8D2D6}
-\definecolor{kw}{HTML}{1F6F8B}
 \definecolor{cmt}{HTML}{7A8B91}
 \definecolor{str}{HTML}{8A5A2B}
 
-\hypersetup{
-  colorlinks=true, linkcolor=water, urlcolor=water, citecolor=water,
-  pdftitle={Catchment Analyzer -- Phase 1 Report},
-  pdfauthor={Aman Pratap}
-}
+\hypersetup{colorlinks=true, linkcolor=water, urlcolor=water,
+  pdftitle={Catchment Analyzer -- Phase 1 Report}}
 
 %----------------------------------------------------------- headings
-\titleformat{\section}{\Large\bfseries\color{ink}}{\thesection}{0.7em}{}
-\titleformat{\subsection}{\large\bfseries\color{water}}{\thesubsection}{0.7em}{}
-\titleformat{\subsubsection}{\normalsize\bfseries\color{ink}}{\thesubsubsection}{0.6em}{}
-\titlespacing*{\section}{0pt}{18pt}{8pt}
+\titleformat{\section}{\large\bfseries\color{ink}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries\color{water}}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
 
 \pagestyle{fancy}
 \fancyhf{}
 \renewcommand{\headrulewidth}{0.4pt}
 \lhead{\small\color{ink}Catchment Analyzer}
-\rhead{\small\color{ink}Phase 1 Report}
+\rhead{\small\color{ink}Phase 1}
 \cfoot{\small\thepage}
 
 \captionsetup{font=small,labelfont={bf,color=ink}}
-\setlist[itemize]{leftmargin=1.3em,itemsep=2pt,topsep=3pt}
-\setlist[enumerate]{leftmargin=1.5em,itemsep=2pt,topsep=3pt}
+\setlist[itemize]{leftmargin=1.2em,itemsep=1pt,topsep=2pt}
+\setlist[enumerate]{leftmargin=1.4em,itemsep=1pt,topsep=2pt}
 
 %----------------------------------------------------------- listings
 \lstdefinelanguage{pseudo}{
-  morekeywords={function,procedure,return,for,foreach,while,if,else,elif,then,do,
-    end,input,output,let,in,to,not,and,or,break,continue,repeat,until,new,push,
-    pop,append,assert,raise,where,each,of,is,from,by,with,all,any,sort,descending},
-  sensitive=true,
-  morecomment=[l]{//},
-  morestring=[b]",
+  morekeywords={function,return,for,foreach,while,if,else,then,do,end,let,in,to,
+    not,and,or,break,continue,new,push,pop,append,assert,of,is,from,by,with,
+    sort,descending,empty},
+  sensitive=true, morecomment=[l]{//}, morestring=[b]",
 }
-
 \lstdefinestyle{pseudostyle}{
   language=pseudo,
   basicstyle=\ttfamily\small\color{ink},
-  keywordstyle=\color{kw}\bfseries,
+  keywordstyle=\color{water}\bfseries,
   commentstyle=\color{cmt}\itshape,
   stringstyle=\color{str},
-  numbers=left, numberstyle=\tiny\color{cmt}, numbersep=9pt,
-  showstringspaces=false,
-  breaklines=true, breakatwhitespace=true,
-  columns=fullflexible, keepspaces=true,
-  frame=none, xleftmargin=2.2em,
-  aboveskip=6pt, belowskip=6pt,
+  numbers=left, numberstyle=\tiny\color{cmt}, numbersep=8pt,
+  showstringspaces=false, breaklines=true, breakatwhitespace=true,
+  columns=fullflexible, keepspaces=true, frame=none, xleftmargin=2em,
+  aboveskip=5pt, belowskip=5pt,
 }
-
-\lstdefinestyle{jsonstyle}{
+\lstdefinestyle{plainstyle}{
   basicstyle=\ttfamily\footnotesize\color{ink},
-  stringstyle=\color{str},
-  showstringspaces=false,
-  breaklines=true,
-  columns=fullflexible, keepspaces=true,
-  frame=none, xleftmargin=1em,
-  aboveskip=4pt, belowskip=4pt,
-}
-
-\lstdefinestyle{shellstyle}{
-  basicstyle=\ttfamily\footnotesize\color{ink},
-  breaklines=true, breakatwhitespace=false,
-  columns=fullflexible, keepspaces=true,
-  frame=none, xleftmargin=1em,
-  aboveskip=4pt, belowskip=4pt,
+  stringstyle=\color{str}, showstringspaces=false, breaklines=true,
+  columns=fullflexible, keepspaces=true, frame=none, xleftmargin=0.8em,
+  aboveskip=3pt, belowskip=3pt,
 }
 
 %----------------------------------------------------------- boxes
-% Left-ruled, page-breakable callouts built on `framed`, so the document
-% compiles on a TeX Live install without the TikZ/PGF collection.
 \definecolor{shadecolor}{HTML}{F4F6F7}
-
 \newenvironment{algobox}[1]{%
-  \par\addvspace{6pt}%
+  \par\addvspace{5pt}%
   \def\FrameCommand{{\color{water}\vrule width 2.5pt}\hspace{9pt}}%
   \MakeFramed{\advance\hsize-\width\FrameRestore}%
-  \noindent{\small\bfseries\color{water}#1}\par\nobreak\addvspace{3pt}%
-}{\par\endMakeFramed\addvspace{6pt}}
+  \noindent{\small\bfseries\color{water}#1}\par\nobreak\addvspace{2pt}%
+}{\par\endMakeFramed\addvspace{5pt}}
 
 \newenvironment{notebox}[1][Note]{%
-  \par\addvspace{6pt}%
+  \par\addvspace{5pt}%
   \def\FrameCommand{{\color{clay}\vrule width 2.5pt}\hspace{9pt}}%
   \MakeFramed{\advance\hsize-\width\FrameRestore}%
-  \noindent{\small\bfseries\color{clay}#1}\par\nobreak\addvspace{3pt}\small%
-}{\par\endMakeFramed\addvspace{6pt}}
+  \noindent{\small\bfseries\color{clay}#1}\par\nobreak\addvspace{2pt}\small%
+}{\par\endMakeFramed\addvspace{5pt}}
 
-\newenvironment{codebox}[1]{%
-  \par\addvspace{6pt}%
-  \def\FrameCommand{\fboxsep=8pt\colorbox{shadecolor}}%
-  \MakeFramed{\FrameRestore}%
-  \noindent{\ttfamily\small\color{ink}#1}\par\nobreak\addvspace{3pt}%
-}{\par\endMakeFramed\addvspace{6pt}}
-
-\newcommand{\stage}[1]{\textcolor{water}{\textbf{#1}}}
+\newenvironment{codebox}{%
+  \par\addvspace{5pt}%
+  \def\FrameCommand{\fboxsep=7pt\colorbox{shadecolor}}%
+  \MakeFramed{\FrameRestore}\noindent%
+}{\par\endMakeFramed\addvspace{5pt}}
 
 %=======================================================================
 \begin{document}
 %=======================================================================
 
-%----------------------------------------------------------- title
-\begin{titlepage}
-\centering
-\vspace*{2.2cm}
-
-{\Huge\bfseries\color{ink} Catchment Analyzer\par}
-\vspace{6mm}
-{\Large\color{water} Terrain-Driven Pond Siting and\\[2mm] Catchment Estimation from Contour Maps\par}
-
-\vspace{8mm}
-{\color{rule}\rule{0.55\textwidth}{1.2pt}}
-\vspace{8mm}
-
-{\large Phase 1 --- Backend API Development\par}
-\vspace{2mm}
-{\normalsize A contour map goes in; a pond site and its catchment come out.\par}
-
-\vspace{18mm}
-
-\begin{tabular}{@{}r@{\hspace{1.2em}}l@{}}
-\textbf{\color{ink}Repository}   & \url{\repourlraw} \\[4pt]
-\textbf{\color{ink}API route}    & \texttt{POST \apiroute} \\[4pt]
-\textbf{\color{ink}Alias route}  & \texttt{POST \apihost/api/findCatchment} \\[4pt]
-\textbf{\color{ink}Live docs}    & \url{\apihost/docs} \\[4pt]
-\textbf{\color{ink}Sample map}   & \texttt{contours\_1m.kml} (1355 lines, 1\,m interval) \\
-\end{tabular}
-
-\vfill
-{\large Aman Pratap\par}
-\vspace{1mm}
-{\small Indian Institute of Technology Bhilai\par}
-\vspace{4mm}
-{\small\today\par}
-\end{titlepage}
-
-%----------------------------------------------------------- toc
-\tableofcontents
-\newpage
-
-%=======================================================================
-\section{Overview}
-%=======================================================================
-
-This report documents a backend service that accepts a contour map as
-\texttt{KML} or \texttt{KMZ}, reconstructs the terrain surface it describes,
-routes water across that surface, and returns --- as structured JSON --- a
-recommended pond location together with the catchment that drains to it.
-
-The central design commitment is that \emph{nothing is specific to the sample
-map}. Extent, elevation range, contour interval, grid resolution and every score
-threshold are derived from whatever file is uploaded. The sample map is used to
-test the implementation, never to calibrate it. Section~\ref{sec:general} sets
-out exactly how this is enforced.
-
-\begin{notebox}[What the service answers]
-Given only contour geometry, three questions are answered together: \emph{where}
-should a pond go, \emph{how much land} drains to it, and \emph{how much water}
-that land yields. A fourth is answered implicitly --- where a pond should
-\emph{not} go, because the ground is a river, a floodplain, or a drainage line
-too large for a farm pond to hold.
-\end{notebox}
-
-\subsection{Deliverables against the brief}
-
-\begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}p{0.42\textwidth}p{0.52\textwidth}@{}}
-\toprule
-\textbf{Requirement} & \textbf{Where it is met} \\
-\midrule
-\texttt{POST /analyzeContour} or \texttt{/findCatchment} & Both exist; \texttt{/findCatchment} is an alias. \S\ref{sec:api} \\
-Accept contour map as uploaded file & \texttt{multipart/form-data}, KML and KMZ. \S\ref{sec:api} \\
-Analyze contour / terrain information & \S\ref{sec:approach}, stages 1--4 \\
-Identify a suitable pond location & \S\ref{sec:siting} \\
-Estimate the catchment area & \S\ref{sec:delineate} \\
-Return structured JSON & \S\ref{sec:schema} \\
-Demonstrate with the sample map & \S\ref{sec:demo} \\
-No hard-coded locations or results & \S\ref{sec:general} \\
-Extensible to generalized maps & \S\ref{sec:extend} \\
-\bottomrule
-\end{tabular}
-\caption{Requirement coverage.}
-\end{table}
-
-%=======================================================================
-\section{System Architecture}
-%=======================================================================
-
-The service is a FastAPI application. The HTTP layer is deliberately thin: it
-validates the upload and delegates immediately to a pure-Python analysis core
-that has no knowledge of HTTP. That separation is what makes the core reusable
-in Phase 2 from a queue worker, a batch script, or a notebook.
-
-\subsection{Processing pipeline}
-
+%----------------------------------------------------------- title block
 \begin{center}
-\small
-\begin{tabular}{@{}c@{}}
-\colorbox{mist}{\parbox{0.86\textwidth}{\centering\vspace{2pt}
-\stage{1. Parse} KML/KMZ $\rightarrow$ contour lines $+$ derived metadata\vspace{2pt}}}\\[3pt]
-$\downarrow$\\[3pt]
-\colorbox{mist}{\parbox{0.86\textwidth}{\centering\vspace{2pt}
-\stage{2. Interpolate} scattered contour vertices $\rightarrow$ regular elevation grid\vspace{2pt}}}\\[3pt]
-$\downarrow$\\[3pt]
-\colorbox{mist}{\parbox{0.86\textwidth}{\centering\vspace{2pt}
-\stage{3. Condition} priority-flood sink fill $\rightarrow$ depression depth $+$ routable surface\vspace{2pt}}}\\[3pt]
-$\downarrow$\\[3pt]
-\colorbox{mist}{\parbox{0.86\textwidth}{\centering\vspace{2pt}
-\stage{4. Route} D8 flow direction $\rightarrow$ flow accumulation $\rightarrow$ stream network\vspace{2pt}}}\\[3pt]
-$\downarrow$\\[3pt]
-\colorbox{mist}{\parbox{0.86\textwidth}{\centering\vspace{2pt}
-\stage{5. Classify} river / floodplain / nala / still water $\rightarrow$ exclusion mask\vspace{2pt}}}\\[3pt]
-$\downarrow$\\[3pt]
-\colorbox{mist}{\parbox{0.86\textwidth}{\centering\vspace{2pt}
-\stage{6. Score \& rank} four weighted suitability layers $\rightarrow$ candidate sites\vspace{2pt}}}\\[3pt]
-$\downarrow$\\[3pt]
-\colorbox{mist}{\parbox{0.86\textwidth}{\centering\vspace{2pt}
-\stage{7. Delineate} upstream walk from chosen outlet $\rightarrow$ catchment polygon\vspace{2pt}}}\\[3pt]
-$\downarrow$\\[3pt]
-\colorbox{mist}{\parbox{0.86\textwidth}{\centering\vspace{2pt}
-\stage{8. Quantify} storage, runoff yield, time of concentration $\rightarrow$ JSON $+$ GeoJSON\vspace{2pt}}}\\
-\end{tabular}
+{\LARGE\bfseries\color{ink} Catchment Analyzer\par}
+\vspace{3mm}
+{\large\color{water} Pond siting and catchment estimation from contour maps\par}
+\vspace{2mm}
+{\small Phase 1 --- Backend API\par}
+\vspace{1mm}
+{\small Indian Institute of Technology Bhilai \quad\textbar\quad \today\par}
+\vspace{4mm}
+{\color{rule}\rule{0.9\textwidth}{0.8pt}}
 \end{center}
 
-\subsection{Module map}
+\vspace{1mm}
+\noindent
+\begin{tabular}{@{}r@{\hspace{1em}}l@{}}
+\textbf{\small Repository} & \small\url{\repourlraw} \\
+\textbf{\small API route}  & \small\texttt{POST \apiroute} \\
+\textbf{\small Alias}      & \small\texttt{POST \apihost/api/findCatchment} \\
+\textbf{\small Live docs}  & \small\url{\apihost/docs} \\
+\textbf{\small Sample map} & \small\texttt{contours\_1m.kml} \\
+\end{tabular}
+
+\vspace{4mm}
+{\color{rule}\hrule}
+\vspace{3mm}
+
+%=======================================================================
+\section{What it does}
+%=======================================================================
+
+Upload a contour map as KML or KMZ. The service rebuilds the terrain surface,
+routes water across it, picks a pond site, and returns the catchment draining to
+that site as JSON.
+
+Nothing is tied to the sample map. Extent, elevation range, contour interval,
+grid size and every normalisation range are read from whatever file arrives. The
+sample was used to test the code, not to tune it.
 
 \begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}llp{0.46\textwidth}@{}}
+\centering\small
+\begin{tabular}{@{}p{0.44\textwidth}p{0.48\textwidth}@{}}
 \toprule
-\textbf{Module} & \textbf{LOC} & \textbf{Responsibility} \\
+\textbf{Requirement} & \textbf{Where} \\
 \midrule
-\texttt{core/kml.py}        & 295 & Parse KML/KMZ; derive interval, bounds, levels \\
-\texttt{core/grid.py}       & 183 & Interpolate contours onto a square-cell grid \\
-\texttt{core/hydrology.py}  & 408 & Sink fill, D8 routing, accumulation, delineation \\
-\texttt{core/siting.py}     & 518 & Suitability scoring, storage, site ranking \\
-\texttt{core/watercourse.py}& 340 & River / floodplain / nala classification \\
-\texttt{core/pipeline.py}   & 533 & Orchestration; assembles the response \\
-\texttt{core/render.py}     & 100 & Elevation, hillshade and watercourse overlays \\
-\texttt{api/routes.py}      & 209 & HTTP endpoints, validation, error mapping \\
-\texttt{models.py}          & 271 & Pydantic response schema \\
-\midrule
-\textbf{Total} & \textbf{$\sim$3500} & \\
+\texttt{POST /analyzeContour} or \texttt{/findCatchment} & Both; the second is an alias (\S\ref{sec:api}) \\
+Accept contour map as upload & \texttt{multipart/form-data}, KML + KMZ \\
+Analyse terrain & \S\ref{sec:approach}, stages 1--4 \\
+Identify pond location & \S\ref{sec:approach}, stage 6 \\
+Estimate catchment area & \S\ref{sec:approach}, stage 7 \\
+Structured JSON & \S\ref{sec:api} \\
+Demonstrate on sample map & \S\ref{sec:demo} \\
+No hard-coded results & \S\ref{sec:general} \\
 \bottomrule
 \end{tabular}
-\caption{Source layout. Each stage of the pipeline is one module with one job.}
 \end{table}
 
 %=======================================================================
-\section{Catchment Estimation Approach}
+\section{Architecture}
+%=======================================================================
+
+FastAPI handles HTTP and nothing else; the analysis core is plain Python with no
+web imports, so it can also be driven from a script or a batch job.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}llp{0.44\textwidth}@{}}
+\toprule
+\textbf{Module} & \textbf{LOC} & \textbf{Job} \\
+\midrule
+\texttt{core/kml.py}         & 295 & Parse KML/KMZ; derive interval and bounds \\
+\texttt{core/grid.py}        & 183 & Interpolate contours onto a square-cell grid \\
+\texttt{core/hydrology.py}   & 408 & Sink fill, D8 routing, delineation \\
+\texttt{core/siting.py}      & 518 & Scoring, storage, ranking \\
+\texttt{core/watercourse.py} & 340 & River / floodplain / nala classification \\
+\texttt{core/pipeline.py}    & 533 & Orchestration and response assembly \\
+\texttt{api/routes.py}       & 209 & Endpoints and validation \\
+\bottomrule
+\end{tabular}
+\caption{About 3500 lines in total. One stage per module.}
+\end{table}
+
+\noindent\textbf{Pipeline.}\quad
+parse $\rightarrow$ interpolate $\rightarrow$ fill sinks $\rightarrow$ D8 route
+$\rightarrow$ classify watercourses $\rightarrow$ score sites $\rightarrow$
+delineate catchment $\rightarrow$ quantify yield.
+
+%=======================================================================
+\section{How the catchment is found}
 \label{sec:approach}
 %=======================================================================
 
-The method is the standard raster-hydrology chain --- fill, route, accumulate,
-delineate --- built on published algorithms rather than invented heuristics. What
-follows is the logic in pseudocode; the repository holds the implementation.
+This is the standard raster-hydrology chain, built on published algorithms
+rather than invented rules. Pseudocode below; the code is in the repository.
 
-\subsection{Stage 1 --- Contour ingestion}
+\subsection{Stage 1 --- Read the contours}
 
-A KMZ is a zip archive; the main \texttt{.kml} is extracted first. Elevation for
-each placemark is taken from whichever source the file actually provides:
-the coordinate $z$ component, an \texttt{<ExtendedData>} field, or a numeric
-name such as \texttt{"272"}. Files in the wild use all three.
+A KMZ is a zip; the \texttt{.kml} inside is extracted first. Elevation comes from
+whichever place the file actually puts it, since files in the wild differ.
 
-\begin{algobox}{Algorithm 1 --- Read contours from KML/KMZ}
+\begin{algobox}{Algorithm 1 --- Read contours}
 \begin{lstlisting}[style=pseudostyle]
-function read_contours(bytes, filename):
-    if bytes is a zip archive then
-        bytes <- extract largest .kml member   // KMZ case
-    doc <- parse_xml(bytes)
+function read_contours(bytes):
+    if bytes is a zip then bytes <- extract largest .kml member
+    foreach placemark in parse_xml(bytes):
+        coords <- parse_coordinates(placemark)
+        z <- first available of: coordinate altitude,
+                                 <ExtendedData> elevation,
+                                 numeric <name>
+        if z exists and coords has >= 2 points then keep ContourLine(coords, z)
 
-    lines <- new list
-    foreach placemark in doc:
-        coords <- parse_coordinates(placemark)   // (lon, lat, z?) triples
-        z <- first available of:
-                 altitude from coordinates,
-                 <ExtendedData> elevation field,
-                 numeric <name> of the placemark
-        if z is not null and coords has >= 2 points then
-            append ContourLine(coords, z) to lines
+    drop levels isolated from the series     // spot heights, stray labels
+    assert >= 3 lines and >= 2 distinct levels
 
-    lines <- drop_isolated_levels(lines)   // spot heights, stray labels
-    assert count(lines) >= 3 and distinct_levels(lines) >= 2
-
-    // Everything below is DERIVED, never assumed:
-    bounds   <- min/max of all vertex lon/lat
-    levels   <- sorted distinct elevations
-    interval <- median gap between neighbouring levels
+    bounds   <- min/max of all vertices      // all DERIVED, never assumed
+    interval <- median gap between levels
     return ContourSet(lines, bounds, levels, interval)
 \end{lstlisting}
 \end{algobox}
 
-\texttt{drop\_isolated\_levels} removes elevation values that do not belong to
-the contour series --- a single placemark at 412\,m among contours spaced every
-metre is a spot height, and interpolating it as terrain would raise a spurious
-hill. The test is relative to the series' own median spacing, so it holds for
-any interval.
+\subsection{Stage 2 --- Build a surface}
 
-\subsection{Stage 2 --- Surface reconstruction}
+Contours are scattered points carrying a $z$ value. A Delaunay-based linear
+interpolation turns them into a grid, with nearest-neighbour fill outside the
+hull and light smoothing to remove triangulation facets.
 
-Contours are scattered vertices carrying a $z$ value. Turning them into a
-surface is a 2-D interpolation over a Delaunay triangulation, with
-nearest-neighbour fill for the region outside the convex hull, and a light
-uniform filter to suppress triangulation facets.
-
-\begin{algobox}{Algorithm 2 --- Interpolate contours onto a grid}
+\begin{algobox}{Algorithm 2 --- Interpolate onto a grid}
 \begin{lstlisting}[style=pseudostyle]
-function build_grid(contours, resolution = 160, margin = 0.01):
-    // Pad so edge contours are not clipped
-    (s, w, n, e) <- contours.bounds expanded by margin
+function build_grid(contours, resolution = 160):
+    (s, w, n, e) <- contours.bounds, padded slightly
 
-    // Cells are kept SQUARE IN METRES -- the D8 model assumes it.
-    width_m  <- haversine(mid_lat, w, mid_lat, e)
-    height_m <- haversine(s, w, n, w)
+    // Cells are kept SQUARE IN METRES -- D8 assumes it.
     if width_m >= height_m then
-        cols <- resolution;  rows <- round(resolution * height_m / width_m)
+        cols <- resolution;  rows <- resolution * height_m / width_m
     else
-        rows <- resolution;  cols <- round(resolution * width_m / height_m)
-    cell_size_m <- mean(width_m / cols, height_m / rows)
+        rows <- resolution;  cols <- resolution * width_m / height_m
 
-    // Control points: every vertex, decimated to a bounded budget
-    step <- max(1, total_vertices / MAX_CONTROL_POINTS)
-    (xy, z) <- vertices[::step] with their line elevations
+    targets <- regular lon/lat mesh (rows x cols), north-up
+    values  <- LinearNDInterpolator(vertices, elevations)(targets)
+    values[NaN] <- NearestNDInterpolator(...)      // outside the hull
+    surface <- uniform_filter(values)
 
-    targets <- regular lon/lat mesh of shape (rows, cols)   // north-up
-    values  <- LinearNDInterpolator(xy, z)(targets)         // Delaunay
-
-    outside <- cells where values is NaN                    // beyond hull
-    values[outside] <- NearestNDInterpolator(xy, z)(targets[outside])
-
-    surface <- uniform_filter(reshape(values, rows, cols), SMOOTH_WINDOW)
-    return ElevationGrid(surface, bounds, cell_size_m,
-                         extrapolated_fraction = mean(outside),
-                         vertical_resolution_m = contours.interval)
+    return ElevationGrid(surface, bounds, cell_size_m, interval)
 \end{lstlisting}
 \end{algobox}
 
-\begin{notebox}[Why square cells matter]
-The D8 model compares drops to eight neighbours over distances of $1$ and
-$\sqrt{2}$ cell widths. If cells were rectangular those distances would be
-wrong and flow would bias along one axis. Solving for the shorter side rather
-than fixing both is what keeps the model valid for maps of any aspect ratio.
-\end{notebox}
+\subsection{Stage 3 --- Fill the sinks}
 
-\subsection{Stage 3 --- Depression filling}
-
-Routing on a raw interpolated surface strands water in every hollow, and flow
-accumulation becomes meaningless. Priority-flood filling
-(Wang \& Liu, 2006) raises each pit to its spill level. The fill depth added at
-a cell is not a by-product to discard --- it \emph{is} the depth of the hollow
-sitting there, which Stage 6 uses directly as evidence of natural storage.
+Routing on a raw surface strands water in every hollow. Priority-flood filling
+raises each pit to its spill level. The fill depth is not waste: it \emph{is} the
+depth of the hollow, which stage 6 uses as evidence of natural storage.
 
 \begin{algobox}{Algorithm 3 --- Priority-flood sink fill}
 \begin{lstlisting}[style=pseudostyle]
 function fill_sinks(z, epsilon = 0):
     filled <- copy of z
-    queue  <- min-heap seeded with ALL BOUNDARY cells, keyed by elevation
-    closed <- boundary cells marked
+    queue  <- min-heap of ALL BOUNDARY cells, keyed by elevation
 
     while queue not empty:
-        (level, r, c) <- pop lowest from queue
-        foreach (nr, nc) in 8-neighbours of (r, c):
-            if inside grid and not closed[nr, nc] then
-                closed[nr, nc] <- true
-                // A cell can be no lower than the lowest rim reaching it
-                filled[nr, nc] <- max(filled[nr, nc], level + epsilon)
-                push (filled[nr, nc], nr, nc) onto queue
+        (level, r, c) <- pop lowest
+        foreach unvisited 8-neighbour (nr, nc):
+            mark visited
+            // no cell can sit lower than the lowest rim reaching it
+            filled[nr, nc] <- max(filled[nr, nc], level + epsilon)
+            push (filled[nr, nc], nr, nc)
     return filled
 
-function depression_depth(z):
-    return max(0, fill_sinks(z, 0) - z)     // head of water standing per cell
-
-function conditioned_surface(z):
-    return fill_sinks(z, epsilon = 1e-4)    // tilt flats so flow is defined
+depression_depth(z)    = max(0, fill_sinks(z, 0) - z)
+conditioned_surface(z) = fill_sinks(z, 1e-4)   // tilt flats so flow is defined
 \end{lstlisting}
 \end{algobox}
 
-The $\epsilon$ tilt matters. A filled pit is a dead-flat lake in which no cell
-has a downhill neighbour, so flow direction is undefined across it. Adding
-$10^{-4}$\,m per step of the flood restores a drainage path without changing any
-elevation meaningfully (Barnes et al., 2014).
+The $\epsilon$ tilt matters: a filled pit is a flat lake where no cell has a
+downhill neighbour, so flow would be undefined across it.
 
-\subsection{Stage 4 --- D8 flow routing}
+\subsection{Stage 4 --- Route the water}
 
-\begin{algobox}{Algorithm 4 --- Flow direction and accumulation}
+\begin{algobox}{Algorithm 4 --- D8 direction and accumulation}
 \begin{lstlisting}[style=pseudostyle]
 function flow_direction(z, cell_size_m):
-    // D8: each cell drains to its steepest downhill neighbour of eight.
-    padded <- z padded by one ring of +infinity   // off-grid can never win
-    best   <- zeros;  direction <- filled with -1 // -1 marks a pit
-
+    // each cell drains to its steepest downhill neighbour of eight
+    padded <- z padded with +infinity          // off-grid can never win
     foreach k, (dr, dc) in the 8 offsets:
-        neighbour <- padded shifted by (dr, dc)
-        slope     <- (z - neighbour) / (cell_size_m * dist[k])
-        steeper   <- slope > best
-        best      <- where(steeper, slope, best)
-        direction <- where(steeper, k, direction)
-    return direction
+        slope <- (z - padded shifted by (dr,dc)) / (cell_size_m * dist[k])
+        direction <- where(slope > best, k, direction)
+    return direction                            // -1 marks a pit
 
 function flow_accumulation(z, direction):
-    // Water only moves downhill, so processing cells from HIGHEST to LOWEST
-    // guarantees a cell's total is final before it is passed on.
-    accumulation <- ones(size of z)             // each cell counts itself
-    foreach cell in cells sorted by z descending:
-        d <- downstream neighbour of cell via direction
-        if d exists then
-            accumulation[d] <- accumulation[d] + accumulation[cell]
+    // water only moves downhill, so highest-to-lowest means a cell's
+    // total is final before it is passed on -- one linear pass
+    accumulation <- ones
+    foreach cell sorted by z descending:
+        d <- downstream neighbour
+        if d exists then accumulation[d] += accumulation[cell]
     return accumulation
 \end{lstlisting}
 \end{algobox}
 
-Sorting by elevation replaces the usual recursive traversal with a single
-linear pass, which is what keeps a $131 \times 160$ grid inside half a second.
-
 \subsection{Stage 5 --- What the ground already is}
 
-Before any site is proposed, the map is split into ground a farm pond may
-occupy and ground it may not. The split is by \emph{upstream area in hectares},
-not by any property of this particular map, so it transfers unchanged to other
-terrain.
+Before proposing anything, the map is split by \emph{upstream area}, so the rule
+transfers to other terrain unchanged.
 
 \begin{table}[H]
-\centering
-\small
+\centering\small
 \begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Class} & \textbf{Test} & \textbf{Consequence} \\
+\textbf{Class} & \textbf{Test} & \textbf{Result} \\
 \midrule
-Farm pond ground & upstream $\le 25$\,ha            & pond proposed \\
-Nala             & $25 < $ upstream $\le 100$\,ha   & bund / percolation tank \\
-River            & upstream $> 100$\,ha             & no structure \\
-Floodplain       & within 40\,m buffer, HAND $< 3$\,m & no structure \\
-Still water      & flat pooled area $\ge 2$\,ha     & no structure \\
+Pond ground  & upstream $\le 25$\,ha           & pond proposed \\
+Nala         & $25 < $ upstream $\le 100$\,ha  & bund / percolation tank \\
+River        & upstream $> 100$\,ha            & nothing proposed \\
+Floodplain   & within 40\,m, HAND $< 3$\,m     & nothing proposed \\
+Still water  & flat pooled area $\ge 2$\,ha    & nothing proposed \\
 \bottomrule
 \end{tabular}
-\caption{Classification thresholds. All are physical, in hectares or metres.}
 \end{table}
 
-\begin{notebox}[The reasoning behind 25 ha]
-ICAR dryland manuals and the MGNREGA works schedule put a farm pond's catchment
-at roughly 1--10\,ha. Past about 25\,ha an ordinary storm delivers more than the
-pond can retain, and the engineering problem becomes a spillway rather than an
-embankment --- a different structure, correctly reported as such rather than
-silently mis-recommended.
-\end{notebox}
+Past roughly 25\,ha a storm delivers more than a farm pond can hold, and the
+problem becomes a spillway rather than an embankment. Reporting that as a
+different structure is more useful than silently recommending the wrong one.
 
-\subsection{Stage 6 --- Pond siting}
-\label{sec:siting}
+\subsection{Stage 6 --- Choose the site}
 
-Every eligible cell is scored on four things a contour map can genuinely answer.
-Each layer is normalised against the range present \emph{in the uploaded map},
-so the score is relative to that terrain and never to an absolute constant.
+Four layers, each normalised against the range present \emph{in the uploaded
+map} --- so the score is relative to that terrain, never to a fixed constant.
 
-\begin{align}
-n(x) &= \frac{x - \min x}{\max x - \min x} \\[4pt]
-L_{\text{depression}} &= n(\text{fill depth}) \\
-L_{\text{catchment}}  &= n\!\left(\log(1 + A)\right) \\
-L_{\text{slope}}      &= n\!\left(\frac{1}{1 + \theta / \theta_{1/2}}\right),
-                         \quad \theta_{1/2} = 8^{\circ} \\
-L_{\text{elevation}}  &= n(-z) \\[6pt]
-S &= 100 \cdot \frac{\sum_i w_i L_i}{\sum_i w_i}
-\end{align}
+\begin{equation}
+n(x) = \frac{x - \min x}{\max x - \min x},
+\qquad
+S = 100 \cdot \frac{\sum_i w_i L_i}{\sum_i w_i}
+\end{equation}
 
-with weights $w = \{$depression $0.30$, catchment $0.30$, slope $0.25$,
-elevation $0.15\}$. The $\log$ on accumulation matters: raw upstream counts span
-orders of magnitude, and without it a single trunk channel would saturate the
-layer and flatten every genuine difference elsewhere.
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{Layer} & \textbf{Value} & \textbf{Weight} \\
+\midrule
+Depression & $n(\text{fill depth})$ & 0.30 \\
+Catchment  & $n(\log(1+A))$ & 0.30 \\
+Slope      & $n\!\left(1/(1+\theta/8^{\circ})\right)$ & 0.25 \\
+Elevation  & $n(-z)$ & 0.15 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\begin{algobox}{Algorithm 5 --- Score, filter and rank candidate sites}
+The logarithm on accumulation matters --- raw upstream counts span orders of
+magnitude, and without it one trunk channel saturates the layer and flattens
+every real difference elsewhere.
+
+\begin{algobox}{Algorithm 5 --- Score, filter, rank}
 \begin{lstlisting}[style=pseudostyle]
-function select_sites(grid, accumulation, depths, direction, max_sites):
-    layers <- { depression: n(depths),
-                catchment:  n(log1p(accumulation)),
-                slope:      n(1 / (1 + slope_deg / 8)),
-                elevation:  n(-grid.z) }
-    score  <- 100 * weighted_sum(layers, WEIGHTS) / sum(WEIGHTS)
+function select_sites(grid, accumulation, depths, max_sites):
+    score <- 100 * weighted_sum(four normalised layers) / sum(weights)
 
-    // Rule out ground that cannot take a pond
-    blocked <- river or floodplain or still_water or edge_ring
-    // A busy channel with no measurable hollow is interpolation, not storage
+    blocked <- river or floodplain or still_water or outer edge ring
+    // busy channel with no hollow the source could measure = interpolation
     holds   <- max(0.30, grid.vertical_resolution_m)
     blocked <- blocked or (accumulation >= percentile(accumulation, 95)
                            and depths < holds)
 
-    ranked <- cells not blocked, sorted by score descending
-    sites  <- new list
-    foreach cell in ranked:
-        if count(sites) = max_sites then break
-        if not spaced_apart(sites, cell, separation) then continue
+    foreach cell in unblocked cells sorted by score descending:
+        if enough sites then break
+        if too close to an accepted site then continue
 
         storage <- natural_storage(grid, depths, cell)
-        inflow  <- upstream_cells * cell_area * 0.4 * 50mm / 1000  // one storm
+        inflow  <- upstream_area * 0.4 * 50mm       // one ordinary storm
         if inflow > storage.volume then
             reclassify as channel structure (bund + waste weir)
         else
-            append PondSite(cell, score, storage, reasons) to sites
-    return sites
+            accept as PondSite
 \end{lstlisting}
 \end{algobox}
 
-Storage is not assumed from a design depth. The sink fill already gives the
-spill elevation, so the pond is grown outwards from the site up to that real rim:
+Storage is measured, not assumed from a design depth. The sink fill already
+gives the spill elevation, so the pond is grown out to that real rim:
 
-\begin{algobox}{Algorithm 6 --- Natural storage by flood fill to the spill rim}
+\begin{algobox}{Algorithm 6 --- Storage by flood fill to the rim}
 \begin{lstlisting}[style=pseudostyle]
 function natural_storage(grid, depths, cell):
-    if depths[cell] <= 0 then return zero storage    // nothing to hold; must be dug
-    spill <- grid.z[cell] + depths[cell]             // the real rim it overtops
+    if depths[cell] <= 0 then return zero      // no hollow; must be dug
+    spill <- grid.z[cell] + depths[cell]
 
-    flooded <- {cell};  queue <- [cell];  head_sum <- 0
-    while queue not empty:
-        (r, c) <- pop front
-        head_sum <- head_sum + (spill - grid.z[r, c])
-        foreach 4-neighbour (nr, nc) not already flooded:
-            if grid.z[nr, nc] < spill then
-                add (nr, nc) to flooded;  push onto queue
+    flood outwards from cell over neighbours with z < spill:
+        head_sum <- head_sum + (spill - z of each flooded cell)
 
-    return { depth_m:        depths[cell],
-             spill_m:        spill,
-             surface_area:   count(flooded) * cell_area,
-             volume_m3:      head_sum * cell_area }
+    return { depth, spill, area = count * cell_area,
+             volume = head_sum * cell_area }
 \end{lstlisting}
 \end{algobox}
 
-\subsection{Stage 7 --- Catchment delineation}
-\label{sec:delineate}
+\subsection{Stage 7 --- Delineate the catchment}
 
-With the site chosen, its catchment is exactly the set of cells whose flow
-pointers lead to it --- found by walking the D8 network \emph{upstream} from the
-outlet.
+The catchment is exactly the set of cells whose flow pointers lead to the site
+--- found by walking the D8 network upstream from it.
 
-\begin{algobox}{Algorithm 7 --- Delineate the catchment of an outlet}
+\begin{algobox}{Algorithm 7 --- Delineate}
 \begin{lstlisting}[style=pseudostyle]
 function delineate(grid, direction, outlet):
-    contributors <- invert(direction)      // downstream pointer -> upstream list
+    contributors <- invert(direction)     // downstream -> list of upstream
     cells <- {outlet};  queue <- [outlet]
     while queue not empty:
-        cell <- pop front
-        foreach up in contributors[cell]:
-            if up not in cells then
-                add up to cells;  push up onto queue
+        foreach up in contributors[pop queue] not already in cells:
+            add up to cells and queue
 
-    area_m2   <- count(cells) * grid.cell_area_m2
-    polygon   <- union of cell squares, exterior ring simplified
-    flow_path <- longest upstream chain from outlet, in metres
+    area      <- count(cells) * cell_area
+    polygon   <- union of cell squares
+    flow_path <- longest upstream chain, in metres
     gradient  <- (max_z - min_z) / flow_path
-    return Catchment(cells, area_m2, polygon, flow_path, gradient, relief, slope)
+    return Catchment(area, polygon, flow_path, gradient, relief, slope)
 \end{lstlisting}
 \end{algobox}
 
-\subsection{Stage 8 --- Quantifying yield}
+\subsection{Stage 8 --- Yield}
 
-Two standard formulae close the analysis. The Rational method gives the water a
-catchment yields; Kirpich gives how quickly it arrives, which is what sizes a
-spillway.
+\begin{equation}
+V = P \cdot A \cdot C
+\qquad\qquad
+t_c = 0.0195\, L^{0.77} S^{-0.385}
+\end{equation}
 
-\begin{align}
-V &= P \cdot A \cdot C
-   &&\text{runoff volume (m\textsuperscript{3})} \\
-t_c &= 0.0195\, L^{0.77} S^{-0.385}
-   &&\text{time of concentration (min)}
-\end{align}
-
-where $P$ is rainfall depth (mm), $A$ catchment area (m\textsuperscript{2}),
-$C$ the runoff coefficient (default $0.4$), $L$ the longest flow path (m) and
-$S$ the average gradient. When no rainfall is supplied the response reports the
-yield per millimetre, $A \cdot C / 1000$, so the caller may apply local rainfall
-themselves.
+$P$ rainfall (mm), $A$ area (m\textsuperscript{2}), $C$ runoff coefficient
+(default 0.4), $L$ longest flow path (m), $S$ gradient. With no rainfall given,
+the response reports yield per millimetre so local rainfall can be applied later.
 
 %=======================================================================
-\section{Generalization: no hard-coded results}
+\section{Nothing is hard-coded}
 \label{sec:general}
 %=======================================================================
 
-This is the requirement most easily failed by accident, so it is worth being
-explicit about what is derived and what is constant.
-
 \begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}p{0.34\textwidth}p{0.28\textwidth}p{0.30\textwidth}@{}}
+\centering\small
+\begin{tabular}{@{}p{0.30\textwidth}p{0.30\textwidth}p{0.30\textwidth}@{}}
 \toprule
-\textbf{Quantity} & \textbf{Source} & \textbf{Sample value} \\
+\textbf{Quantity} & \textbf{Comes from} & \textbf{On the sample} \\
 \midrule
-Geographic extent      & vertex min/max        & 21.240--21.264\,N \\
-Elevation range        & contour $z$ values    & 267--298\,m \\
-Contour interval       & median level gap      & 1.0\,m \\
-Grid rows $\times$ cols& extent aspect ratio   & $131 \times 160$ \\
-Cell size              & haversine / cols      & 20.6\,m \\
-Score normalisation    & map's own min/max     & per-upload \\
-Pond location          & argmax of score       & computed \\
-Catchment area         & upstream cell count   & computed \\
+Geographic extent   & vertex min/max      & 21.240--21.264\,N \\
+Elevation range     & contour $z$ values  & 267--298\,m \\
+Contour interval    & median level gap    & 1.0\,m \\
+Grid shape          & extent aspect ratio & $131 \times 160$ \\
+Cell size           & haversine / cols    & 20.6\,m \\
+Score normalisation & the map's own range & per upload \\
+Pond location       & argmax of score     & computed \\
+Catchment area      & upstream cell count & computed \\
 \bottomrule
 \end{tabular}
-\caption{Every map-specific quantity is derived at request time.}
 \end{table}
 
-The only constants in the codebase are physical or engineering ones that hold
-anywhere: the 25\,ha and 100\,ha structure thresholds, the $8^{\circ}$
-slope half-score, the 50\,mm storm test, Kirpich's coefficients, and the D8
-neighbour geometry. None encodes a location.
-
-\begin{notebox}[A concrete check]
-Uploading a different contour map produces a different grid shape, a different
-cell size, different normalisation ranges and a different site --- with no code
-change. The companion endpoint \texttt{/analyzeArea} exercises the same core on
-terrain downloaded for arbitrary world coordinates, which is the strongest
-available evidence that the analysis is not tuned to the sample.
-\end{notebox}
+The only constants are physical ones that hold anywhere: the 25\,ha and 100\,ha
+thresholds, the $8^{\circ}$ slope half-score, the 50\,mm storm test and
+Kirpich's coefficients. None encodes a location. A second endpoint,
+\texttt{/analyzeArea}, runs the same core on terrain downloaded for arbitrary
+world coordinates --- reasonable evidence the analysis is not tuned to one map.
 
 %=======================================================================
-\section{API Documentation}
+\section{API}
 \label{sec:api}
 %=======================================================================
 
-\subsection{Endpoints}
-
 \begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}llp{0.40\textwidth}@{}}
+\centering\small
+\begin{tabular}{@{}llp{0.38\textwidth}@{}}
 \toprule
 \textbf{Method} & \textbf{Path} & \textbf{Purpose} \\
 \midrule
 \texttt{POST} & \texttt{/api/analyzeContour} & Analyse an uploaded contour map \\
 \texttt{POST} & \texttt{/api/findCatchment}  & Alias of the above \\
-\texttt{POST} & \texttt{/api/analyzeArea}    & Analyse by coordinates (no file) \\
-\texttt{GET}  & \texttt{/api/elevation}      & Point elevation lookup \\
+\texttt{POST} & \texttt{/api/analyzeArea}    & Analyse by coordinates, no file \\
 \texttt{GET}  & \texttt{/api/health}         & Liveness check \\
-\texttt{GET}  & \texttt{/docs}               & Interactive OpenAPI documentation \\
+\texttt{GET}  & \texttt{/docs}               & Interactive documentation \\
 \bottomrule
 \end{tabular}
-\caption{Both prefixed (\texttt{/api/...}) and bare (\texttt{/...}) paths are served.}
 \end{table}
 
-\begin{notebox}[The analysis routes are POST-only]
-\texttt{/api/analyzeContour} carries a file in the request body and therefore
-cannot be opened from a browser address bar --- a \texttt{GET} correctly returns
-\texttt{405 Method Not Allowed}. To exercise it interactively, open
-\url{\apihost/docs}, which provides an upload form bound to the live endpoint.
+\begin{notebox}[The analysis route is POST-only]
+It carries a file in the request body, so it cannot be opened from a browser
+address bar --- a \texttt{GET} correctly returns \texttt{405 Method Not
+Allowed}. To try it interactively, open \url{\apihost/docs}, which gives an
+upload form wired to the live endpoint.
 \end{notebox}
 
-\subsection{Request}
-
-\texttt{Content-Type: multipart/form-data}
+\subsection{Request --- \texttt{multipart/form-data}}
 
 \begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}lllp{0.34\textwidth}@{}}
+\centering\small
+\begin{tabular}{@{}lllp{0.32\textwidth}@{}}
 \toprule
 \textbf{Field} & \textbf{Type} & \textbf{Default} & \textbf{Meaning} \\
 \midrule
-\texttt{file}              & file  & required & Contour map, \texttt{.kml} or \texttt{.kmz}, $\le 64$\,MB \\
-\texttt{resolution}        & int   & 160      & Cells along the longer side (48--260) \\
-\texttt{max\_sites}        & int   & 5        & Candidate sites to return \\
-\texttt{runoff\_coefficient}& float& 0.4      & $C$ in the Rational method \\
-\texttt{rainfall\_mm}      & float & null     & If given, absolute runoff volume is computed \\
+\texttt{file}               & file  & required & \texttt{.kml} or \texttt{.kmz}, $\le 64$\,MB \\
+\texttt{resolution}         & int   & 160      & Cells along the longer side (48--260) \\
+\texttt{max\_sites}         & int   & 5        & Candidate sites returned \\
+\texttt{runoff\_coefficient}& float & 0.4      & $C$ in the Rational method \\
+\texttt{rainfall\_mm}       & float & null     & If given, absolute runoff volume \\
 \bottomrule
 \end{tabular}
-\caption{Request parameters. Only \texttt{file} is mandatory.}
 \end{table}
 
-\subsection{Response schema}
-\label{sec:schema}
+\subsection{Response --- \texttt{200 OK}, abridged}
 
-\begin{codebox}{200 OK --- abridged}
-\begin{lstlisting}[style=jsonstyle]
+\begin{codebox}
+\begin{lstlisting}[style=plainstyle]
 {
   "success": true,
   "analysis_id": "ca_aff346d081",
-  "generated_at": "2026-09-01T17:28:13+00:00",
-  "source":   { "kind", "format", "contour_lines", "vertices",
-                "elevation_levels", "contour_interval_m", "bounds" },
-  "terrain":  { "min_elevation_m", "max_elevation_m", "relief_m",
-                "mean_slope_deg", "mapped_area_km2", "grid" },
-  "pond_site":{ "rank", "latitude", "longitude", "elevation_m",
-                "slope_deg", "depression_depth_m", "upstream_hectares",
-                "height_above_drainage_m", "structure", "score",
-                "rating", "score_breakdown", "storage", "reasons" },
-  "catchment":{ "outlet", "area_m2", "area_km2", "area_hectares",
-                "cell_count", "perimeter_m", "relief_m",
-                "longest_flow_path_m", "average_gradient",
-                "time_of_concentration_min", "runoff" },
-  "alternative_sites":  [ ... ],
-  "channel_structures": [ ... ],
-  "watercourses":       { ... },
-  "overlays":           { "elevation", "hillshade", "watercourse" },
-  "geojson":            { "type": "FeatureCollection", "features": [ ... ] },
-  "warnings":           [ ... ]
+  "source":    { "format", "contour_lines", "vertices",
+                 "contour_interval_m", "bounds" },
+  "terrain":   { "min_elevation_m", "max_elevation_m", "relief_m",
+                 "mean_slope_deg", "mapped_area_km2", "grid" },
+  "pond_site": { "latitude", "longitude", "elevation_m", "slope_deg",
+                 "depression_depth_m", "upstream_hectares", "structure",
+                 "score", "rating", "score_breakdown", "storage" },
+  "catchment": { "outlet", "area_m2", "area_hectares", "cell_count",
+                 "perimeter_m", "longest_flow_path_m", "average_gradient",
+                 "time_of_concentration_min", "runoff" },
+  "alternative_sites": [...],  "channel_structures": [...],
+  "watercourses": {...},       "overlays": {...},
+  "geojson": { "type": "FeatureCollection", "features": [...] },
+  "warnings": [...]
 }
 \end{lstlisting}
 \end{codebox}
 
-\subsection{Error responses}
+\subsection{Errors}
+
+All share the shape \texttt{\{success, error, detail\}}.
 
 \begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}llp{0.44\textwidth}@{}}
+\centering\small
+\begin{tabular}{@{}ll@{}}
 \toprule
-\textbf{Status} & \textbf{Meaning} & \textbf{Typical cause} \\
-\midrule
-400 & Bad request      & Not a KML/KMZ, or unreadable archive \\
-405 & Method not allowed & \texttt{GET} on a POST-only analysis route \\
-413 & Payload too large& Upload exceeds 64\,MB \\
-422 & Unprocessable    & Fewer than 3 contour lines or 2 distinct levels \\
-500 & Analysis failed  & Interpolation produced an incomplete surface \\
+400 & Not a KML/KMZ, or unreadable archive \\
+405 & \texttt{GET} on a POST-only route \\
+413 & Upload over 64\,MB \\
+422 & Fewer than 3 contour lines or 2 distinct levels \\
+500 & Interpolation produced an incomplete surface \\
 \bottomrule
 \end{tabular}
-\caption{Errors share one shape: \texttt{\{success, error, detail\}}.}
 \end{table}
 
 %=======================================================================
@@ -765,216 +556,110 @@ cannot be opened from a browser address bar --- a \texttt{GET} correctly returns
 \label{sec:demo}
 %=======================================================================
 
-Run against the provided \texttt{contours\_1m.kml}:
-
-\begin{codebox}{Request}
-\begin{lstlisting}[style=shellstyle]
-curl -X POST \apiroute \
-     -F "file=@contours_1m.kml" \
-     -F "resolution=160"
+\begin{codebox}
+\begin{lstlisting}[style=plainstyle]
+curl -X POST \apiroute -F "file=@contours_1m.kml"
 \end{lstlisting}
 \end{codebox}
 
-\noindent Observed: \texttt{HTTP 200}, 43{,}588 bytes, in approximately
-0.5\,s.
-
-\subsection{What was read from the file}
+\noindent Returned \texttt{HTTP 200}, 43{,}588 bytes, in about 0.5\,s.
 
 \begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}lr@{}}
+\centering\small
+\begin{tabular}{@{}lr@{\hspace{2.5em}}lr@{}}
 \toprule
-\textbf{Property} & \textbf{Derived value} \\
+\multicolumn{2}{@{}l}{\textbf{\color{water}Read from the file}} &
+\multicolumn{2}{l}{\textbf{\color{water}Reconstructed terrain}} \\
 \midrule
-Contour lines            & 1{,}355 \\
-Vertices                 & 159{,}113 \\
-Distinct elevation levels& 32 \\
-Contour interval         & 1.0\,m \\
-Elevation range          & 267.0 -- 298.0\,m \\
-Bounds (S, W, N, E)      & 21.2398, 81.2814, 21.2636, 81.3126 \\
+Contour lines     & 1{,}355            & Grid        & $131 \times 160$ \\
+Vertices          & 159{,}113          & Cell size   & 20.605\,m \\
+Distinct levels   & 32                 & Mapped area & 8.90\,km\textsuperscript{2} \\
+Contour interval  & 1.0\,m             & Relief      & 29.13\,m \\
+Elevation range   & 267--298\,m        & Mean slope  & $2.37^{\circ}$ \\
 \bottomrule
 \end{tabular}
-\caption{Stage 1 output --- entirely derived from the upload.}
 \end{table}
-
-\subsection{Reconstructed terrain}
 
 \begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}lr@{}}
+\centering\small
+\begin{tabular}{@{}lr@{\hspace{2.5em}}lr@{}}
 \toprule
-Grid                     & $131 \times 160$ cells \\
-Cell size / area         & 20.605\,m / 424.57\,m\textsuperscript{2} \\
-Mapped area              & 8.8989\,km\textsuperscript{2} \\
-Elevation (min/mean/max) & 267.55 / 283.83 / 296.67\,m \\
-Relief                   & 29.13\,m \\
-Mean / max slope         & $2.37^{\circ}$ / $13.36^{\circ}$ \\
-Extrapolated fraction    & 0.0755 \\
+\multicolumn{2}{@{}l}{\textbf{\color{water}Pond site (rank 1)}} &
+\multicolumn{2}{l}{\textbf{\color{water}Its catchment}} \\
+\midrule
+Location        & 21.249651, 81.286503 & \textbf{Area} & \textbf{9.47\,ha} \\
+Structure       & Farm pond            & Cells         & 223 \\
+Score           & 54.3 (Moderate)      & Perimeter     & 1{,}867.6\,m \\
+Elevation       & 277.38\,m            & Relief        & 9.61\,m \\
+Slope           & $1.11^{\circ}$       & Flow path     & 601.4\,m \\
+Depression      & 2.74\,m              & Gradient      & 0.01599 \\
+Spill elevation & 280.12\,m            & $t_c$         & 13.2\,min \\
+Water surface   & 21{,}228\,m\textsuperscript{2} & Yield & 37.87\,m\textsuperscript{3}/mm \\
+\textbf{Storage}& \textbf{26{,}811\,m\textsuperscript{3}} & Share of map & 1.06\,\% \\
 \bottomrule
 \end{tabular}
-\caption{Stage 2--3 output.}
 \end{table}
 
-\subsection{Recommended pond site and its catchment}
+\subsection{The numbers check out}
 
-\begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}lr@{}}
-\toprule
-\multicolumn{2}{@{}l}{\textbf{\color{water}Pond site (rank 1)}} \\
-\midrule
-Location                 & 21.249651\,N, 81.286503\,E \\
-Structure                & Farm pond \\
-Score / rating           & 54.3 --- Moderate \\
-Ground elevation         & 277.38\,m \\
-Slope                    & $1.11^{\circ}$ \\
-Depression depth         & 2.74\,m \\
-Height above drainage    & 5.66\,m \\
-Spill elevation          & 280.12\,m \\
-Water surface area       & 21{,}228.3\,m\textsuperscript{2} \\
-\textbf{Storage volume}  & \textbf{26{,}811.3\,m\textsuperscript{3}} \\
-\midrule
-\multicolumn{2}{@{}l}{\textbf{\color{water}Catchment}} \\
-\midrule
-Outlet                   & site coordinates \\
-\textbf{Area}            & \textbf{9.47\,ha} (94{,}678.2\,m\textsuperscript{2}) \\
-Cell count               & 223 \\
-Perimeter                & 1{,}867.6\,m \\
-Elevation range          & 275.66 -- 285.27\,m (relief 9.61\,m) \\
-Mean / max slope         & $2.84^{\circ}$ / $7.48^{\circ}$ \\
-Longest flow path        & 601.4\,m \\
-Average gradient         & 0.01599 \\
-Time of concentration    & 13.2\,min \\
-Runoff yield             & 37.87\,m\textsuperscript{3} per mm of rainfall \\
-Share of mapped area     & 1.06\,\% \\
-\bottomrule
-\end{tabular}
-\caption{Primary result for the sample contour map.}
-\end{table}
-
-\subsection{Arithmetic check}
-
-Both reported quantities reproduce from the formulae in \S\ref{sec:approach},
-which is a useful guard against a plausible-looking but wrong number:
+Both headline figures reproduce from the formulae in \S\ref{sec:approach}:
 
 \begin{align}
-\text{yield} &= \frac{A \cdot C}{1000}
-              = \frac{94678.2 \times 0.4}{1000}
-              = 37.87\ \text{m\textsuperscript{3}/mm} \quad\checkmark \\
-t_c &= 0.0195 \times 601.4^{0.77} \times 0.01599^{-0.385}
-     = 13.2\ \text{min} \quad\checkmark
+\text{yield} &= \frac{94678.2 \times 0.4}{1000} = 37.87\ \text{m}^3\text{/mm}
+  \quad\checkmark \\
+t_c &= 0.0195 \times 601.4^{0.77} \times 0.01599^{-0.385} = 13.2\ \text{min}
+  \quad\checkmark
 \end{align}
 
-\subsection{Ground the analysis refused}
+\subsection{Ground it refused}
 
-The map is not uniformly available for a farm pond, and the service says so
-rather than proposing a site in a river:
-
-\begin{table}[H]
-\centering
-\small
-\begin{tabular}{@{}lr@{}}
-\toprule
-River                & 51.46\,ha \\
-Floodplain           & 229.18\,ha \\
-Nala                 & 9.38\,ha \\
-Truncated channels   & 1.70\,ha \\
-Still water          & 0.00\,ha \\
-\midrule
-\textbf{Excluded fraction} & \textbf{32.59\,\%} \\
-\bottomrule
-\end{tabular}
-\caption{Stage 5 output. Roughly a third of the map carries no pond proposal.}
-\end{table}
-
-Where a pond is inappropriate the service proposes the structure that
-\emph{is} appropriate rather than returning nothing. The best such alternative
-on this map is a nala bund at 21.247414\,N, 81.289911\,E, serving 51.46\,ha,
-scoring 65.5 (\emph{Good}) --- a higher score than the pond, correctly reported
-as a different structure.
-
-\subsection{Map output}
-
-Alongside the JSON, the response carries GeoJSON (12 features: catchment
-polygon, site markers, stream network, longest flow path) and three PNG
-overlays --- elevation, hillshade and watercourse classification --- georeferenced
-to the analysis bounds.
+River 51.46\,ha, floodplain 229.18\,ha, nala 9.38\,ha, truncated channels
+1.70\,ha --- \textbf{32.6\,\% of the map carries no pond proposal}. Where a pond
+is wrong the service names the structure that is right: the best alternative
+here is a nala bund at 21.247414, 81.289911 serving 51.46\,ha, scoring 65.5
+(\emph{Good}) --- higher than the pond, correctly reported as something else.
 
 \IfFileExists{figures/catchment-map.png}{%
   \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{figures/catchment-map.png}
-  \caption{Analysis of the sample map. Marker \textbf{1} is the recommended
-  pond site with its catchment outlined; \textbf{2}--\textbf{5} are ranked
-  alternatives; \textbf{B1}--\textbf{B3} are nala-bund proposals on drainage
-  lines too large for a farm pond. The blue trunk is the classified river.}
-  \label{fig:map}
+  \caption{Marker \textbf{1} is the recommended pond site with its catchment
+  outlined; \textbf{2}--\textbf{5} are ranked alternatives; \textbf{B1}--%
+  \textbf{B3} are nala bunds on drainage lines too large for a pond.}
   \end{figure}
 }{%
-  \begin{notebox}[Figure placeholder]
+  \begin{notebox}[Figure]
   Save the map screenshot as \texttt{report/figures/catchment-map.png} and
-  recompile; the figure and its caption will appear here automatically.
+  recompile --- the figure appears here automatically.
   \end{notebox}
 }
 
 %=======================================================================
-\section{Extensibility to Phase 2}
-\label{sec:extend}
+\section{Extending it, and what it cannot do}
 %=======================================================================
 
-The architecture anticipates generalization in four specific ways.
+\textbf{Built to extend.} \texttt{build\_grid} is shared by the contour path and
+the DEM path, so a grid from a raster has the same geometry as one from
+contours and every later stage is source-agnostic --- adding GeoTIFF input means
+writing one reader. Thresholds are in hectares and metres, so no retuning for a
+new district. Resolution is a request parameter. The core imports nothing from
+FastAPI.
 
-\begin{enumerate}[label=\textbf{\arabic*.}]
-\item \textbf{Terrain source is pluggable.} \texttt{build\_grid} and
-\texttt{grid\_shape} are shared by the contour path and the DEM-download path.
-A grid built from a downloaded raster has exactly the geometry one built from
-contours would, so every downstream stage is source-agnostic. Adding GeoTIFF or
-Shapefile input means writing one reader that returns a \texttt{ContourSet} ---
-nothing in hydrology, siting or the API changes.
-
-\item \textbf{Thresholds are physical, not positional.} Structure
-classification is in hectares and metres. Moving to a different district,
-state or country requires no retuning.
-
-\item \textbf{Resolution is a request parameter.} The same map can be analysed
-coarsely for a fast preview or finely for a design study (48--260 cells per
-side) without redeployment.
-
-\item \textbf{The core is HTTP-free.} \texttt{core/} imports nothing from
-FastAPI. The identical pipeline can be driven from a batch job, a scheduled
-task or a notebook in Phase 2.
-\end{enumerate}
-
-\subsection{Known limitations}
-
-Stated plainly, since they bound what the current results mean:
-
-\begin{itemize}
-\item Interpolation between contours cannot recover features finer than the
-contour interval; on this map, hollows shallower than 1\,m are not
-distinguishable from smoothing artefacts, which is why the channel test uses
-the interval as its floor.
-\item About 7.6\,\% of the sample grid lies outside the contour convex hull and
-is nearest-neighbour extrapolated; the outer ring is excluded from siting for
-this reason.
-\item Catchments are clipped by the map extent. Flow entering from beyond the
-mapped area is not counted, and the response emits a warning when a candidate's
-catchment touches the boundary.
-\item Runoff uses the Rational method, which is appropriate for small
-catchments ($<$ 25\,ha here) but not for basin-scale routing.
-\end{itemize}
+\textbf{Limits, stated plainly.} Interpolation cannot recover features finer
+than the contour interval, so hollows under 1\,m are indistinguishable from
+smoothing artefacts on this map. About 7.6\,\% of the grid lies outside the
+contour hull and is extrapolated, which is why the outer ring is excluded from
+siting. Catchments are clipped by the map extent --- flow from beyond it is not
+counted, and the response warns when a catchment touches the boundary. The
+Rational method suits small catchments, not basin-scale routing.
 
 %=======================================================================
-\section{Reproducing the result}
+\section{Running it}
 %=======================================================================
 
-\begin{codebox}{Local}
-\begin{lstlisting}[style=shellstyle]
-git clone \repourlraw
-cd catchment_analyzer
+\begin{codebox}
+\begin{lstlisting}[style=plainstyle]
+git clone \repourlraw && cd catchment_analyzer
 python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
 .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 5249
 
@@ -982,31 +667,21 @@ curl -X POST http://localhost:5249/api/analyzeContour -F "file=@contours_1m.kml"
 \end{lstlisting}
 \end{codebox}
 
-\begin{codebox}{Docker}
-\begin{lstlisting}[style=shellstyle]
-docker compose up --build      # API and UI published on port 5249
-\end{lstlisting}
-\end{codebox}
+\noindent Or \texttt{docker compose up --build}, which publishes on port 5249.
 
 %=======================================================================
 \section*{References}
-\addcontentsline{toc}{section}{References}
 %=======================================================================
 
 \begin{enumerate}[label={[\arabic*]}]
 \item O'Callaghan, J.F. \& Mark, D.M. (1984). The extraction of drainage
-networks from digital elevation data. \emph{Computer Vision, Graphics and
-Image Processing}, 28(3), 323--344.
+networks from digital elevation data. \emph{CVGIP}, 28(3), 323--344.
 \item Wang, L. \& Liu, H. (2006). An efficient method for identifying and
-filling surface depressions in digital elevation models.
-\emph{International Journal of Geographical Information Science}, 20(2), 193--213.
-\item Barnes, R., Lehman, C. \& Mulla, D. (2014). Priority-flood: an optimal
-depression-filling and watershed-labeling algorithm for digital elevation
-models. \emph{Computers \& Geosciences}, 62, 117--127.
+filling surface depressions in DEMs. \emph{IJGIS}, 20(2), 193--213.
+\item Barnes, R., Lehman, C. \& Mulla, D. (2014). Priority-flood.
+\emph{Computers \& Geosciences}, 62, 117--127.
 \item Kirpich, Z.P. (1940). Time of concentration of small agricultural
 watersheds. \emph{Civil Engineering}, 10(6), 362.
-\item Indian Council of Agricultural Research. \emph{Dryland Agriculture
-Manual --- Farm Pond Design}.
 \end{enumerate}
 
 \end{document}
