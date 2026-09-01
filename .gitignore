@@ -19,3 +19,11 @@ storage/
 .vscode/
 .idea/
 .DS_Store
+
+# LaTeX build artefacts
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.fls
+report/*.fdb_latexmk
