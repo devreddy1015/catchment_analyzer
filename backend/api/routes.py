@@ -4,8 +4,12 @@ Thin by design: validate the request, hand it to the analysis pipeline, translat
 failures into status codes. All of the terrain work lives in ``backend.core``.
 
 Terrain reaches the pipeline two ways, and there is one route for each:
-``/analyzeContour`` for an uploaded survey, ``/analyzeArea`` for a place on the
+``/analyze-contour`` for an uploaded survey, ``/analyzeArea`` for a place on the
 map, whose elevations are downloaded from the OpenZenith service.
+
+The contour route is the published contract: ``POST /api/analyze-contour`` with
+the map in a multipart field named ``contour_map``. Older spellings of both the
+path and the field still work, so nothing that already calls this service breaks.
 """
 from __future__ import annotations
 
@@ -32,14 +36,21 @@ AREA_RESPONSES = {
 }
 
 
+def _looks_like_contour_map(data: bytes) -> bool:
+    """Do these bytes open as a KMZ archive or an XML document?
+
+    Clients do not always send a useful filename -- an API testing tool may post
+    the part as ``blob``, and a browser drag-and-drop can drop the extension. The
+    bytes are the more reliable witness, so they get the final say.
+    """
+    if data[:2] == b"PK":  # KMZ is a ZIP archive.
+        return True
+    head = data[:4096].lstrip().lower()
+    return head.startswith(b"<?xml") or b"<kml" in head
+
+
 async def _read_upload(file: UploadFile) -> tuple[bytes, str]:
     filename = file.filename or "upload.kml"
-    if not filename.lower().endswith(settings.ALLOWED_EXTENSIONS):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Upload a {' or '.join(e.upper().lstrip('.') for e in settings.ALLOWED_EXTENSIONS)} "
-                   f"file. Received '{filename}'.",
-        )
 
     data = await file.read()
     if not data:
@@ -48,6 +59,14 @@ async def _read_upload(file: UploadFile) -> tuple[bytes, str]:
         raise HTTPException(
             status_code=413,
             detail=f"File is {len(data) / 1e6:.1f} MB; the limit is {settings.MAX_UPLOAD_MB} MB.",
+        )
+
+    # A known extension is enough on its own; without one, the content decides.
+    if not filename.lower().endswith(settings.ALLOWED_EXTENSIONS) and not _looks_like_contour_map(data):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Upload a {' or '.join(e.upper().lstrip('.') for e in settings.ALLOWED_EXTENSIONS)} "
+                   f"file. Received '{filename}'.",
         )
     return data, filename
 
@@ -75,15 +94,21 @@ async def _analyse_upload(
         raise HTTPException(status_code=422, detail=f"Terrain could not be modelled: {exc}") from exc
 
 
-@router.post(
-    "/analyzeContour",
-    response_model=CatchmentAnalysis,
-    responses=ANALYSE_RESPONSES,
-    tags=["Catchment"],
-    summary="Analyse a contour map and return its pond site and catchment",
+# Every spelling of the contour route reaches the same handler. The published
+# contract is the first one; the rest are kept so the bundled UI and anything
+# written against the older names keep working.
+CONTOUR_PATHS = (
+    ("/analyze-contour", True),
+    ("/analyzeContour", True),
+    ("/analyze_contour", False),
+    ("/findCatchment", False),
+    ("/find-catchment", False),
 )
+
+
 async def analyze_contour(
-    file: UploadFile = File(..., description="Contour map as KML or KMZ."),
+    contour_map: UploadFile | None = File(None, description="Contour map as KML or KMZ."),
+    file: UploadFile | None = File(None, description="Alias of `contour_map`, for older callers."),
     resolution: int = Form(
         settings.DEFAULT_RESOLUTION,
         description=f"Grid cells along the longer side of the map "
@@ -99,29 +124,30 @@ async def analyze_contour(
 ) -> CatchmentAnalysis:
     """Upload a contour map and get back the catchment information needed to plan a pond.
 
-    The file is parsed into contour lines, interpolated into an elevation grid,
-    routed with a D8 flow model, and searched for the best pond site. The
-    catchment reported is the land draining to that site.
+    Send the map as multipart form-data under the field name **`contour_map`**.
+    It is parsed into contour lines, interpolated into an elevation grid, routed
+    with a D8 flow model, and searched for the best pond site. The catchment
+    reported is the land draining to that site.
     """
-    return await _analyse_upload(file, resolution, max_sites, runoff_coefficient, rainfall_mm)
+    upload = contour_map or file
+    if upload is None:
+        raise HTTPException(
+            status_code=422,
+            detail="No contour map received. Send the KML or KMZ as multipart form-data "
+                   "under the field name 'contour_map'.",
+        )
+    return await _analyse_upload(upload, resolution, max_sites, runoff_coefficient, rainfall_mm)
 
 
-@router.post(
-    "/findCatchment",
-    response_model=CatchmentAnalysis,
-    responses=ANALYSE_RESPONSES,
-    tags=["Catchment"],
-    summary="Alias of /analyzeContour",
-)
-async def find_catchment(
-    file: UploadFile = File(..., description="Contour map as KML or KMZ."),
-    resolution: int = Form(settings.DEFAULT_RESOLUTION),
-    max_sites: int = Form(5),
-    runoff_coefficient: float = Form(0.4),
-    rainfall_mm: float | None = Form(None),
-) -> CatchmentAnalysis:
-    """Identical to `/analyzeContour`; both names are provided for convenience."""
-    return await _analyse_upload(file, resolution, max_sites, runoff_coefficient, rainfall_mm)
+for _path, _documented in CONTOUR_PATHS:
+    router.post(
+        _path,
+        response_model=CatchmentAnalysis,
+        responses=ANALYSE_RESPONSES,
+        tags=["Catchment"],
+        summary="Analyse a contour map and return its pond site and catchment",
+        include_in_schema=_documented,
+    )(analyze_contour)
 
 
 @router.post(
